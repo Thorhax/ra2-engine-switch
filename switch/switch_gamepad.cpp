@@ -101,6 +101,7 @@ void SwitchGamepad::emit_pointer(InputEvent::Kind k, InputEvent::Button b, uint3
 }
 
 void SwitchGamepad::emit_vk(int vk, uint32_t t, bool ctrl, int key) {
+    if (debug_) std::fprintf(stderr, "[pad] key vk=%d ctrl=%d key=%d\n", vk, ctrl ? 1 : 0, key);
     InputEvent e;
     e.kind = InputEvent::Key;
     e.vk = vk;
@@ -155,11 +156,15 @@ void SwitchGamepad::button(int b, bool down, uint32_t t) {
             const InputEvent::Button pb = b == kBtnA ? InputEvent::Left : InputEvent::Right;
             if (b == kBtnB && in_sidebar()) {
                 // B always cancels / deselects; a right click on the sidebar
-                // does neither (X has the cameo right click), so click the
-                // battlefield where the cursor last was, then point back.
+                // does neither (X has the cameo right click), so on release
+                // click the battlefield where the cursor last was, then point
+                // back. One whole click: moving away with the button held
+                // would be a right-drag (a map scroll), not a deselect.
+                if (down) break;
                 const int mx = static_cast<int>(map_x_), my = static_cast<int>(map_y_);
                 emit_pointer(InputEvent::PointerMove, pb, t, mx, my);
-                emit_pointer(down ? InputEvent::PointerDown : InputEvent::PointerUp, pb, t, mx, my);
+                emit_pointer(InputEvent::PointerDown, pb, t, mx, my);
+                emit_pointer(InputEvent::PointerUp, pb, t, mx, my);
                 emit_pointer(InputEvent::PointerMove, pb, t);
                 break;
             }

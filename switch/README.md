@@ -34,25 +34,49 @@ The log warns when it runs in applet mode.
 
 | Input | Action |
 |---|---|
-| Left stick | Cursor (hold ZL for precision) |
-| Right stick | Scroll the map (over the sidebar: the build list) |
-| A / B | Left / right click (hold A + move = selection box) |
-| L / R / ZR (hold) | Shift / Ctrl / Alt modifiers |
-| D-pad ↑ → ↓ ← | Team 1–4 (R + D-pad: create team, L + D-pad: add to selection) |
-| X / Y | Deploy / select same type |
-| L3 / R3 | Stop / jump to last radar event |
-| + / − | Options menu / center on base |
-| Touch screen (handheld) | The Android touch controls |
+| Left stick | Pan the map (quadratic; about twice as fast with the stick on its rim) |
+| Right stick | Cursor (quadratic) |
+| A | Select / order (move, attack, harvest, enter...). Twice: every visible unit of that type |
+| B | Cancel / deselect; cancels building placement |
+| Y | Hold and move the cursor: selection box. Tap: every combat unit |
+| X | Deploy / unload / special ability. Over the sidebar: hold or cancel the cameo's production |
+| R | Tap: cursor jumps between the battlefield and the build strip (and back to where it was) |
+| R + D-pad ↑ → ↓ ← | Select team 1–4; with ZR held too: make the selection team 1–4 |
+| ZR + A | Force fire (ground, friendlies) |
+| ZL + A | Attack-move. ZL tapped alone: guard |
+| L | Tap: scatter. Hold: stop |
+| L3 | Jump to the last radar event. Twice: the MCV / Construction Yard |
+| R3 | Center on the selection |
+| D-pad ↑ / ↓ | Repair / sell mode |
+| D-pad ← / → | Previous / next production tab (Structures, Defenses, Infantry, Vehicles) |
+| − | Mission objectives (campaign) / pause menu (skirmish) |
+| + | Options / save / load menu |
+| Touch screen (handheld) | The touch controls (tap, drag, CMD column); the controller's cursor hides them again |
 
-## Hardware status (2026-10-29, Atmosphère, hbmenu title takeover)
+The engine has no escort command (Ctrl+Alt) and no waypoint mode, so ZL + A is attack-move.
+
+## Hardware status (2026-10-30, Atmosphère, hbmenu title takeover)
 
 | | Stock Mesa 20.1 | Mesa 26.2.4 (NVK/zink SDK) |
 |---|---|---|
 | Boot, menus, Bink menu video, music | yes | yes |
-| Skirmish (menus → lobby → match), 1280x720 | 60 fps locked; update 1.4 ms, render 3.6 ms | ~59.5 fps; "slow EGL config" |
-| Combat, AI, deploy, build, place | yes | yes (quick skirmish) |
-| Load time, default 1v1 | 22.5 s | 22.9 s |
+| Skirmish (menus → lobby → match), 1280x720 | 60 fps locked; update 1.4 ms, render 3.2 ms | 60 fps; "slow EGL config" |
+| Combat, AI, deploy, build, place | yes | yes |
+| Load time, default 1v1 | 11.2 s (was 22.5 s) | 11.7 s |
+| First frame of a match | 0.35 s (was 7.9 s) | 0.32 s |
 | HOME → Close | clean | clean once exit is locked (see below) |
+
+Switch-only optimizations (each behind `__SWITCH__`):
+
+- **Terrain atlas** (`engine/iso_renderer.cpp`): creating a texture costs ~2.2 ms in the Switch's GL driver, and a
+  map's terrain needs ~3300 of them (7.3 s in the first frame). The tiles and their cliff extras are packed into
+  2048x2048 pages instead. It also trims steady render time.
+- **Vehicle loading** (`load_vehicle_assets`): `rulesmd.ini` / `artmd.ini` are parsed once instead of once per
+  vehicle (7.3 s), and each vehicle's facing sets are built on cores 0–2 (`ra2_switch_parallel`).
+- **Voxel prewarm** (per house colour, after loading) runs on cores 1–2: 11 s → 5.7 s.
+- **Building anims** are read on the loading screen instead of in the first game tick (a 390 ms hitch).
+- Horizon threads stay on their creator's core unless pinned: `ra2_switch_pin_thread` /
+  `ra2_switch_parallel` in `switch_platform.cpp`.
 
 Two Mesa 26 problems, both worked around in `switch_platform.cpp`:
 
