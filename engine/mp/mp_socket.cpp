@@ -28,6 +28,9 @@ using socklen_t = int;
 #include <sys/socket.h>
 #include <unistd.h>
 #endif
+#ifdef __SWITCH__
+#include <switch.h>
+#endif
 
 namespace ra2mp {
 
@@ -151,6 +154,12 @@ std::vector<LocalIf> interfaces() {
         }
     }
     ::closesocket(s);
+#elif defined(__SWITCH__)
+    // Switch: no SIOCGIFCONF; nifm reports the one active (Wi-Fi or LAN)
+    // connection. Addresses come back in network byte order.
+    u32 ip = 0, mask = 0, gw = 0, dns1 = 0, dns2 = 0;
+    if (R_SUCCEEDED(nifmGetCurrentIpConfigInfo(&ip, &mask, &gw, &dns1, &dns2)) && ip != 0)
+        out.push_back(LocalIf{ntohl(ip), ntohl(mask), std::string("wlan0")});
 #else
     // SIOCGIFCONF works on every Android API level (getifaddrs needs 24+).
     const int s = ::socket(AF_INET, SOCK_DGRAM, 0);

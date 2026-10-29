@@ -32,3 +32,7 @@
 *.keystore
 # W6-06-02 release packages (scripts/package-win.ps1)
 /dist/
+/build-switch/
+/build-switch-stock/
+/switch/rig/rig.env
+__pycache__/

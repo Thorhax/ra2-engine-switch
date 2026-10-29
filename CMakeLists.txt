@@ -47,6 +47,12 @@ if (RA2_BUILD_SHARED)
     set_target_properties(ra2assets_so PROPERTIES OUTPUT_NAME ra2assets)
 endif()
 
+# Nintendo Switch (devkitPro toolchain): only the engine .nro, see switch/switch.cmake.
+if (NINTENDO_SWITCH)
+    include(${CMAKE_CURRENT_SOURCE_DIR}/switch/switch.cmake)
+    return()
+endif()
+
 enable_testing()
 add_executable(ra2assets_tests
     tests/test_main.cpp

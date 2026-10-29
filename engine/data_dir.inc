@@ -10,7 +10,8 @@
 //   4. the directory holding the executable,
 //   5. the retail install's registry key (HKLM\SOFTWARE\Westwood\Red Alert 2
 //      InstallPath, which names ra2.exe -- the original's own lookup),
-//   6. the historical dev default D:\Red Alert 2.
+//   6. the historical dev default D:\Red Alert 2 (not on Switch: there the
+//      .nro's folder, sdmc:/switch/ra2engine/, is the default).
 // The first candidate that holds ra2.mix wins; when none does, the first
 // EXPLICIT one (1-3) or else the dev default is returned so the missing-files
 // page can name it.
@@ -139,7 +140,9 @@ std::vector<std::string> data_dir_candidates() {
         if (!reg.empty()) c.push_back(with_trailing_sep(reg));
     }
 #endif
+#ifndef __SWITCH__
     c.push_back("D:\\Red Alert 2\\");
+#endif
 #endif
     return c;
 }

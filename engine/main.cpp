@@ -35,6 +35,13 @@ static char* ra2_cli_pref_path() {
 #define SDL_GetPrefPath(org, app) ra2_cli_pref_path()
 #define SDL_AndroidGetExternalStoragePath() static_cast<const char*>(nullptr)
 #endif
+#ifdef __SWITCH__
+// switch-sdl2 has no filesystem backend (both calls return NULL): use the
+// SD-card folder of the .nro (switch/switch_platform.hpp).
+#include "switch_platform.hpp"
+#define SDL_GetBasePath() ra2_switch_base_path()
+#define SDL_GetPrefPath(org, app) ra2_switch_pref_path()
+#endif
 
 #include <algorithm>
 #include <array>

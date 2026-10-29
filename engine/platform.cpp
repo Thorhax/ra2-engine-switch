@@ -1,6 +1,9 @@
 #include "platform.hpp"
 #include <algorithm>
 #include "touch_gestures.hpp"
+#ifdef __SWITCH__
+#include "switch_gamepad.hpp"   // switch/: stick cursor + hotkeys
+#endif
 
 #include <SDL.h>
 #include <cstdio>
@@ -15,6 +18,9 @@ struct Platform::Impl {
     int w = 0;
     int h = 0;
     TouchGestures touch;   // G-70 gesture layer (fed by SDL_FINGER*)
+#ifdef __SWITCH__
+    SwitchGamepad pad{};   // Joy-Con / Pro Controller (fed by SDL_JOY*)
+#endif
     // W9-04-04: a phone returning from the background can deliver a mouse
     // event (no real mouse: the window corner) -- it switched the game to
     // mouse mode and edge-scrolled the map into the black. Mouse events are
@@ -105,6 +111,9 @@ Platform Platform::create(const char* title, int w, int h, bool hidden) {
     Platform p;
     p.p_ = new Impl{window, renderer, w, h, TouchGestures{}};
     p.p_->update_slop();
+#ifdef __SWITCH__
+    p.p_->pad.init(w, h);
+#endif
     return p;
 }
 
@@ -151,6 +160,9 @@ void Platform::set_logical_size(int w, int h) {
     p_->h = h;
     SDL_RenderSetLogicalSize(p_->renderer, w, h);
     p_->update_slop();
+#ifdef __SWITCH__
+    p_->pad.set_logical_size(w, h);
+#endif
 }
 void Platform::output_size(int& w, int& h) const {
     w = h = 0;
@@ -248,13 +260,26 @@ bool Platform::touch_hold(int& x, int& y, float& progress) const {
 bool Platform::poll(InputEvent& ev) {
     ev = InputEvent{};
     if (p_->touch.pop(ev)) return true;   // G-70: queued gesture events first
+#ifdef __SWITCH__
+    if (p_->pad.pop(ev)) return true;
+#endif
     SDL_Event e;
     if (!SDL_PollEvent(&e)) {
         p_->touch.tick(SDL_GetTicks());   // long-press fires with no new event
         if (p_->touch.pop(ev)) return true;
+#ifdef __SWITCH__
+        p_->pad.tick(SDL_GetTicks());     // stick cursor / map scroll
+        if (p_->pad.pop(ev)) return true;
+#endif
         ev.kind = InputEvent::None;
         return false;
     }
+#ifdef __SWITCH__
+    if (p_->pad.handle(e)) {
+        ev.kind = InputEvent::None;
+        return true;   // its events are drained at the top of the next poll()
+    }
+#endif
 
     switch (e.type) {
         case SDL_QUIT:
@@ -355,6 +380,9 @@ bool Platform::poll(InputEvent& ev) {
         // pan); the produced events are drained at the top of poll().
         case SDL_FINGERDOWN:
             p_->last_touch = true;
+#ifdef __SWITCH__
+            p_->pad.on_touch(static_cast<int>(e.tfinger.x * p_->w), static_cast<int>(e.tfinger.y * p_->h));
+#endif
             p_->touch.finger_down(e.tfinger.fingerId, static_cast<int>(e.tfinger.x * p_->w),
                                   static_cast<int>(e.tfinger.y * p_->h), e.tfinger.timestamp);
             ev.kind = InputEvent::None;
@@ -387,6 +415,10 @@ void Platform::begin_frame() {
 }
 
 void Platform::present() {
+#ifdef __SWITCH__
+    // No OS pointer on Switch: draw one wherever the engine expects it.
+    if (SDL_ShowCursor(SDL_QUERY) == SDL_ENABLE) p_->pad.draw_cursor(p_->renderer);
+#endif
     SDL_RenderPresent(p_->renderer);
 }
 
