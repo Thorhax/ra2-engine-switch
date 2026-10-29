@@ -257,6 +257,10 @@ struct TerrainSlot {
     int level = -1;   // W2-GA-05: lit palette level, -1 = the plain palette
     SDL_Texture* tex = nullptr;
     SDL_Texture* etex = nullptr;
+    SDL_Rect src{0, 0, 0, 0};   // the tile's rect in `tex` when it is an atlas page
+    SDL_Rect esrc{0, 0, 0, 0};  // the extra's rect in `etex` (atlas)
+    bool atlas = false, eatlas = false;
+    int ew = -1, eh = 0;        // atlas mode: the extra's size (-1 = not decoded yet)
 };
 struct TerrainDrawList {
     const ra2assets::MapFile* map = nullptr;
@@ -336,6 +340,88 @@ SDL_Texture* slot_texture(TextureCache& tc, Theater& theater, const ra2assets::P
     return s.tex;
 }
 
+// Terrain atlas: one texture per tile costs ~2.2 ms each in the Switch's GL
+// driver (a map's 3300 tiles = 7.3 s in its first frame, decode 20 ms of it),
+// so there the tiles are packed into a few RGBA pages instead. Elsewhere the
+// per-tile textures stay as they were.
+#ifdef __SWITCH__
+constexpr bool kTerrainAtlas = true;
+#else
+constexpr bool kTerrainAtlas = false;
+#endif
+constexpr int kAtlasPage = 2048;
+std::vector<std::string> g_atlas_keys;   // the current list's pages (pinned)
+
+void build_terrain_atlas(TextureCache& tc, Theater& theater, const ra2assets::Palette& pal,
+                         std::vector<TerrainSlot>& slots, uint64_t build) {
+    for (const std::string& k : g_atlas_keys) tc.unpin(k);   // the previous list's pages
+    g_atlas_keys.clear();
+    // Every tile image and every cliff / slope extra of the list's slots.
+    struct Img { size_t slot; bool extra; ra2assets::TileImage img; const ra2assets::Palette* p; };
+    std::vector<Img> imgs;
+    imgs.reserve(slots.size() + slots.size() / 8);
+    for (size_t i = 0; i < slots.size(); ++i) {
+        TerrainSlot& s = slots[i];
+        const ra2assets::TmpFile* tmp = theater.tmp_for_tile(s.tile);
+        if (!tmp) continue;
+        const ra2assets::Palette* p = (s.level < 0 || !g_level_pals || s.level >= static_cast<int>(g_level_pals->size()))
+                                          ? &pal : &(*g_level_pals)[static_cast<size_t>(s.level)];
+        imgs.push_back(Img{i, false, tmp->decode(s.sub), p});
+        if (tmp->has_extra(s.sub)) imgs.push_back(Img{i, true, tmp->decode_extra(s.sub), p});
+    }
+    std::vector<size_t> order;   // the ones that fit a page (others keep the per-tile path)
+    for (size_t k = 0; k < imgs.size(); ++k) {
+        const ra2assets::TileImage& im = imgs[k].img;
+        if (im.w > 0 && im.h > 0 && im.w <= kAtlasPage && im.h <= kAtlasPage) order.push_back(k);
+    }
+    // Shelf packing, tallest first; a 1 px transparent gap keeps neighbours
+    // apart (the renderer samples nearest, so nothing bleeds across it).
+    std::stable_sort(order.begin(), order.end(),
+                     [&](size_t a, size_t b) { return imgs[a].img.h > imgs[b].img.h; });
+    std::vector<ra2assets::Rgba> page(static_cast<size_t>(kAtlasPage) * kAtlasPage);
+    std::vector<size_t> on_page;
+    int x = 0, y = 0, row_h = 0;
+    auto flush = [&]() {
+        if (on_page.empty()) return;
+        const int used_h = y + row_h;
+        const std::string key = "terrain_atlas#" + std::to_string(build) + ":" + std::to_string(g_atlas_keys.size());
+        SDL_Texture* tex = static_cast<SDL_Texture*>(
+            tc.get_rgba(key, reinterpret_cast<const uint8_t*>(page.data()), kAtlasPage, used_h));
+        tc.pin(key);
+        g_atlas_keys.push_back(key);
+        for (size_t k : on_page) {
+            TerrainSlot& s = slots[imgs[k].slot];
+            (imgs[k].extra ? s.etex : s.tex) = tex;
+            (imgs[k].extra ? s.eatlas : s.atlas) = tex != nullptr;
+        }
+        on_page.clear();
+        std::fill(page.begin(), page.end(), ra2assets::Rgba{0, 0, 0, 0});
+        x = y = row_h = 0;
+    };
+    for (size_t k : order) {
+        const ra2assets::TileImage& im = imgs[k].img;
+        if (x + im.w > kAtlasPage) { x = 0; y += row_h + 1; row_h = 0; }
+        if (y + im.h > kAtlasPage) flush();
+        const ra2assets::Palette& p = *imgs[k].p;
+        for (int r = 0; r < im.h; ++r) {
+            const uint8_t* srow = im.indices.data() + static_cast<size_t>(r) * im.w;
+            ra2assets::Rgba* drow = page.data() + static_cast<size_t>(y + r) * kAtlasPage + x;
+            for (int c = 0; c < im.w; ++c) {   // = TextureCache::get's palettize
+                if (const uint8_t idx = srow[c]) {
+                    drow[c] = p[idx];
+                    drow[c].a = 255;
+                }
+            }
+        }
+        TerrainSlot& s = slots[imgs[k].slot];
+        (imgs[k].extra ? s.esrc : s.src) = SDL_Rect{x, y, im.w, im.h};
+        on_page.push_back(k);
+        x += im.w + 1;
+        row_h = std::max(row_h, im.h);
+    }
+    flush();
+}
+
 TerrainDrawList& terrain_list(TextureCache& tc, const ra2assets::MapFile& map, Theater& theater,
                               const ra2assets::Palette& pal) {
     static TerrainDrawList L;
@@ -401,7 +487,19 @@ TerrainDrawList& terrain_list(TextureCache& tc, const ra2assets::MapFile& map, T
             // THIS subtile's diamond is (x_extra - x, y_extra - y).
             it.ex = static_cast<int16_t>(tmp->extra_x(sub) - tmp->tile_x(sub));
             it.ey = static_cast<int16_t>(tmp->extra_y(sub) - tmp->tile_y(sub));
-            if (SDL_Texture* et = extra_texture(tc, theater, pal, L.slots[static_cast<size_t>(it.slot)])) {
+            TerrainSlot& sl = L.slots[static_cast<size_t>(it.slot)];
+            if (kTerrainAtlas) {
+                // The atlas uploads the extras later; only their size is needed here.
+                if (sl.ew < 0) {
+                    const ra2assets::TileImage eimg = tmp->decode_extra(sub);
+                    sl.ew = std::max(0, eimg.w);
+                    sl.eh = std::max(0, eimg.h);
+                }
+                if (sl.ew > 0 && sl.eh > 0) {
+                    it.ew = static_cast<uint16_t>(sl.ew);
+                    it.eh = static_cast<uint16_t>(sl.eh);
+                }
+            } else if (SDL_Texture* et = extra_texture(tc, theater, pal, sl)) {
                 int ew = 0, eh = 0;
                 SDL_QueryTexture(et, nullptr, nullptr, &ew, &eh);
                 it.ew = static_cast<uint16_t>(ew);
@@ -429,7 +527,9 @@ void set_terrain_level_palettes(const std::vector<ra2assets::Palette>* pals) {
 
 void prewarm_terrain(TextureCache& tc, const ra2assets::MapFile& map, Theater& theater,
                      const ra2assets::Palette& pal) {
+    const uint64_t built_before = g_terrain_builds;
     TerrainDrawList& L = terrain_list(tc, map, theater, pal);
+    if (kTerrainAtlas && g_terrain_builds != built_before) build_terrain_atlas(tc, theater, pal, L.slots, g_terrain_builds);
     for (TerrainSlot& s : L.slots) slot_texture(tc, theater, pal, s);
 }
 
@@ -442,8 +542,10 @@ int draw_terrain(void* sdl_renderer, TextureCache& tc,
     TerrainDrawList& L = terrain_list(tc, map, theater, pal);
     // W2-GA-P4: a (re)built list uploads every tile the map uses right away,
     // so scrolling into new terrain never pays a first-use decode later.
-    if (g_terrain_builds != built_before)
+    if (g_terrain_builds != built_before) {
+        if (kTerrainAtlas) build_terrain_atlas(tc, theater, pal, L.slots, g_terrain_builds);
         for (TerrainSlot& s : L.slots) slot_texture(tc, theater, pal, s);
+    }
     const MapIndex& idx = map_index(map);
     if (L.items.empty()) return 0;
     // Shroud [RE: presentation.md §4, W2-GA-02]: with a World whose shroud is
@@ -467,13 +569,13 @@ int draw_terrain(void* sdl_renderer, TextureCache& tc,
             TerrainSlot& s = L.slots[static_cast<size_t>(it.slot)];
             SDL_Texture* tex = slot_texture(tc, theater, pal, s);
             if (!tex) continue;
-            SDL_RenderCopy(renderer, tex, nullptr, &dst);
+            SDL_RenderCopy(renderer, tex, s.atlas ? &s.src : nullptr, &dst);
             ++drawn;
             if (it.ew) {
                 const SDL_Rect edst{it.px + cam.x + it.ex, it.py + cam.y + it.ey, it.ew, it.eh};
                 if (!(edst.x + edst.w <= 0 || edst.y + edst.h <= 0 || edst.x >= view_w || edst.y >= view_h))
                     if (SDL_Texture* et = extra_texture(tc, theater, pal, s))
-                        SDL_RenderCopy(renderer, et, nullptr, &edst);
+                        SDL_RenderCopy(renderer, et, s.eatlas ? &s.esrc : nullptr, &edst);
             }
             if (fog && !vis->visible_at(viewer, it.cx, it.cy)) {
                 SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);

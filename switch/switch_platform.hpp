@@ -11,3 +11,15 @@
 
 char* ra2_switch_base_path();
 char* ra2_switch_pref_path();
+
+#include <functional>
+#include <vector>
+
+// A Horizon thread runs on its creator's default core unless told otherwise,
+// so plain std::threads share core 0 with the main thread. These pin the
+// calling thread to an application core (0..2; 3 belongs to the system).
+void ra2_switch_pin_thread(int core);
+// Runs `jobs` on the caller plus one pinned worker thread per entry of
+// `worker_cores` and returns when all are done. The jobs must be independent.
+void ra2_switch_parallel(const std::vector<std::function<void()>>& jobs,
+                         const std::vector<int>& worker_cores = {1, 2});

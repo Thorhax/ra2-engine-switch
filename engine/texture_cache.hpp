@@ -56,6 +56,8 @@ public:
     std::size_t size() const { return cache_.size(); }
     std::size_t evicted() const { return evicted_; }
     void pin(const std::string& key);
+    // Undo pin(): the entry is evictable again (the budget LRU frees it).
+    void unpin(const std::string& key);
     // W2-AR-26: drop EVERY texture (SDL_RENDER_DEVICE_RESET: the GL context
     // was lost, every handle is invalid) and take a new instance_id(), so the
     // pointer caches keyed on it (terrain draw list) rebuild. Entries come

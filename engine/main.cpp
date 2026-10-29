@@ -1785,10 +1785,36 @@ VehicleAssets load_vehicle_assets(const std::string& dir, const ra2assets::MixFi
     load_progress("VEHICLE VOXELS");   // W2-AR-02 loading-screen checkpoint
     VehicleAssets va;
     try {
+#ifdef __SWITCH__
+        // Switch: the rules / art INIs are the same for every vehicle; parse
+        // them once per data dir (re-opening ra2md.mix and parsing both for
+        // each of a skirmish's ~56 vehicles cost 7.3 s of its load). Rules /
+        // Art are thin views, so they live beside their Ini.
+        struct VehicleIni {
+            Ini rules_ini, art_ini;
+            std::optional<Rules> rules;
+            std::optional<Art> art;
+        };
+        static std::map<std::string, std::unique_ptr<VehicleIni>> s_vehicle_ini;
+        std::unique_ptr<VehicleIni>& vi = s_vehicle_ini[dir];
+        if (!vi) {
+            auto fresh = std::make_unique<VehicleIni>();
+            fresh->rules_ini = load_ini_from_ra2md(dir, "rulesmd.ini");
+            fresh->rules.emplace(Rules::load(fresh->rules_ini));
+            fresh->art_ini = load_ini_from_ra2md(dir, "artmd.ini");
+            fresh->art.emplace(Art::load(fresh->art_ini));
+            vi = std::move(fresh);
+        }
+        const Ini& rules_ini = vi->rules_ini;
+        const Rules& rules = *vi->rules;
+        const Ini& art_ini = vi->art_ini;
+        const Art& art = *vi->art;
+#else
         Ini rules_ini = load_ini_from_ra2md(dir, "rulesmd.ini");
         Rules rules = Rules::load(rules_ini);
         Ini art_ini = load_ini_from_ra2md(dir, "artmd.ini");
         Art art = Art::load(art_ini);
+#endif
 
         const ResolvedUnit ru = resolve_combat_unit(rules, unit_id);
         va.combat = ru.combat;
@@ -1915,6 +1941,29 @@ VehicleAssets load_vehicle_assets(const std::string& dir, const ra2assets::MixFi
                 src->has_wo = load_part(base + "wo", src->wo, src->wo_h);
             va.vsrc = src;
         }
+#ifdef __SWITCH__
+        {   // Switch: the (house x part) facing sets are independent; build
+            // them on the three application cores (most of a vehicle's load).
+            const ra2assets::Palette hps[2] = {ra2engine::pal_for_house(unit_pal, 0),
+                                               ra2engine::pal_for_house(unit_pal, 1)};
+            std::vector<std::function<void()>> jobs;
+            for (int house = 0; house <= 1; ++house) {
+                const ra2assets::Palette& hp = hps[house];
+                jobs.push_back([&, house] {
+                    va.hull[house] = ra2engine::build_facing_set(hull_m, hull_h, ra2engine::kVehicleFacings, vpl, hp);
+                });
+                if (va.has_turret)
+                    jobs.push_back([&, house] {
+                        va.turret[house] = ra2engine::build_facing_set(tur_m, tur_h, ra2engine::kVehicleFacings, vpl, hp);
+                    });
+                if (va.has_barrel)
+                    jobs.push_back([&, house] {
+                        va.barrel[house] = ra2engine::build_facing_set(barl_m, barl_h, ra2engine::kVehicleFacings, vpl, hp);
+                    });
+            }
+            ra2_switch_parallel(jobs);
+        }
+#else
         for (int house = 0; house <= 1; ++house) {
             const ra2assets::Palette hp = ra2engine::pal_for_house(unit_pal, house);
             va.hull[house] =
@@ -1926,6 +1975,7 @@ VehicleAssets load_vehicle_assets(const std::string& dir, const ra2assets::MixFi
                 va.barrel[house] =
                     ra2engine::build_facing_set(barl_m, barl_h, ra2engine::kVehicleFacings, vpl, hp);
         }
+#endif
 
         // Death explosion (Rules::explosion_first -> SHP from conquer.mix,
         // drawn with anim.pal from cache.mix if present, else the unit pal).
@@ -6779,6 +6829,14 @@ public:
         ra2engine::InputEvent ev = ev_in;     // W2-AR-08: the touch bar may add modifiers
         track_pointer(ev);           // G0/G-71: pointer position from events, not SDL state
         if (ev.touch) touch_ui_ = true;   // W4-AM: the touch column / banner appear (also while locked)
+#ifdef __SWITCH__
+        // Handheld touch and the controller take turns: the controller's
+        // pointer (no finger) puts the touch column / hints away again.
+        else if (ev.kind == ra2engine::InputEvent::PointerMove || ev.kind == ra2engine::InputEvent::PointerDown) {
+            touch_ui_ = false;
+            touch_bar_open_ = false;
+        }
+#endif
         if (net_handle(ev)) return;  // NET-PLAY: end / stall dialogs, the chat line
         if (ui_handle(ev)) return;   // P7: options menu / save-load dialog first
         // W4-MC-02 [RE: TAction 0x2E LockInput -> FUN_00683c80 sets
@@ -7277,6 +7335,19 @@ public:
             }
             menu_.set_tracks(std::move(t));
         }
+#ifdef __SWITCH__
+        {   // Switch: every roster building's anim / bib art now, on the loading
+            // screen (theater SHPs from the mixes); lazily it cost the first
+            // game tick ~390 ms on the Switch's CPU.
+            load_progress("BUILDING ANIMS");
+            const auto t0 = std::chrono::steady_clock::now();
+            for (const ra2engine::BuildingTypeDef& d : ba_.roster)
+                pres_.fx().building(pres_upper(d.image.empty() ? d.id : d.image));
+            std::cerr << "[fx] building anims prewarmed: " << ba_.roster.size() << " types in "
+                      << std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count()
+                      << " ms\n";
+        }
+#endif
     }
 
     // render_world + placement cursor + sidebar chrome + production chrome.
@@ -7690,6 +7761,12 @@ private:
             show_briefing_ = !show_briefing_;   // P10: the mission briefing (Brief:<map>)
             return true;
         }
+        // Switch: the controller's Minus sends kKeyF1 with no VK (never the
+        // View1 = F1 hotkey); outside a campaign it opens the pause menu.
+        if (!campaign_ && ev.kind == ra2engine::InputEvent::Key && ev.key == ra2engine::kKeyF1 && ev.vk == 0) {
+            if (!menu_.open_ && !sld_.is_open() && !gf_abort_.open()) menu_.open();
+            return true;
+        }
         if (ingame_movie_.active()) {   // W5-E: a key / click skips the trigger movie
             if (ev.kind == ra2engine::InputEvent::Key ||
                 (ev.kind == ra2engine::InputEvent::PointerDown && ev.button == ra2engine::InputEvent::Left))
@@ -8069,13 +8146,28 @@ private:
         }
         const std::vector<const VehicleAssets*> list = vlist_;
         prewarm_ = std::thread([this, keys, list]() {
+#ifdef __SWITCH__
+            ra2_switch_pin_thread(2);   // off the main thread's core 0
+#endif
             const auto t0 = std::chrono::steady_clock::now();
             int n = 0;
+#ifdef __SWITCH__
+            std::vector<std::function<void()>> jobs;   // this thread (core 2) + core 1
+            for (int k : keys)
+                for (const VehicleAssets* va : list)
+                    if (va) {
+                        jobs.push_back([this, va, k]() { if (!prewarm_stop_) vxl_prewarm(*va, k); });
+                        ++n;
+                    }
+            ra2_switch_parallel(jobs, {1});
+            if (prewarm_stop_) return;
+#else
             for (int k : keys)
                 for (const VehicleAssets* va : list) {
                     if (prewarm_stop_) return;
                     if (va) { vxl_prewarm(*va, k); ++n; }
                 }
+#endif
             std::cerr << "[vxl-prewarm] " << n << " sets in "
                       << std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count()
                       << " ms (worker thread)\n";

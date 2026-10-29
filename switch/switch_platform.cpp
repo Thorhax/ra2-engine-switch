@@ -5,9 +5,11 @@
 #include <arpa/inet.h>   // struct in_addr for __nxlink_host
 #include <switch.h>
 
+#include <atomic>
 #include <cstdio>
 #include <cstdlib>
 #include <sys/stat.h>
+#include <thread>
 
 namespace {
 constexpr const char* kPrefDir = RA2_SWITCH_BASE_DIR "save/";
@@ -15,6 +17,25 @@ constexpr const char* kLogFile = RA2_SWITCH_BASE_DIR "save/ra2engine.log";
 }  // namespace
 
 char* ra2_switch_base_path() { return SDL_strdup(RA2_SWITCH_BASE_DIR); }
+
+void ra2_switch_pin_thread(int core) {
+    svcSetThreadCoreMask(CUR_THREAD_HANDLE, core, 1u << core);
+}
+
+void ra2_switch_parallel(const std::vector<std::function<void()>>& jobs, const std::vector<int>& worker_cores) {
+    std::atomic<std::size_t> next{0};
+    auto run = [&]() {
+        for (std::size_t i; (i = next.fetch_add(1)) < jobs.size();) jobs[i]();
+    };
+    std::vector<std::thread> workers;
+    for (std::size_t k = 0; k < worker_cores.size() && k + 1 < jobs.size(); ++k)
+        workers.emplace_back([&run, core = worker_cores[k]]() {
+            ra2_switch_pin_thread(core);
+            run();
+        });
+    run();
+    for (std::thread& t : workers) t.join();
+}
 
 char* ra2_switch_pref_path() {
     ::mkdir(RA2_SWITCH_BASE_DIR, 0777);
