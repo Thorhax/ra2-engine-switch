@@ -79,7 +79,8 @@ Switch-only optimizations (each behind `__SWITCH__`):
   (`build_facing_sets`; only the palette lookup differed), as (part x half) jobs on three cores: 4.1 s → 2.1 s for
   Soviet 1's 65 vehicles. The death explosions (conquer.mix / cache.mix, the SHPs, anim.pal) are read once per data
   dir instead of per vehicle (0.64 s).
-- **Voxel prewarm** (per house colour, after loading) runs on cores 1–2: 11 s → 5.7 s.
+- **Voxel prewarm** (per house colour, after loading) runs on cores 1–2, one job per vehicle that rasterizes each
+  facing once for every colour in the match: 11 s → 2.0 s.
 - **Building anims** are read on the loading screen instead of in the first game tick (a 390 ms hitch).
 - **Shroud with allied sight** (`World::step_visibility`, all platforms, same result): campaign maps share sight
   between allied houses, and the merge copied and OR-ed every house's grid byte by byte each tick (3.1 ms of a

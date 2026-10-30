@@ -3676,6 +3676,42 @@ void vxl_prewarm(const VehicleAssets& va, int key) {
     auto& slot = va.color_sets[key];
     if (!slot) slot = std::move(built);
 }
+#ifdef __SWITCH__
+// vxl_prewarm for several colours at once: each facing is rasterized once and
+// coloured per key (build_facing_sets), the sets the draw path built first kept.
+void vxl_prewarm_colors(const VehicleAssets& va, const std::vector<int>& keys) {
+    if (!va.vsrc) return;
+    std::vector<int> todo;
+    {
+        std::lock_guard<std::mutex> lk(g_vxl_mu);
+        for (int k : keys) {
+            if (k < 10) continue;
+            auto it = va.color_sets.find(k);
+            if (it == va.color_sets.end() || !it->second) todo.push_back(k);
+        }
+    }
+    if (todo.empty()) return;
+    const VehicleAssets::VoxelSrc& s = *va.vsrc;
+    const int n = static_cast<int>(todo.size()), nf = ra2engine::kVehicleFacings;
+    std::vector<ra2assets::Palette> pals;
+    for (int k : todo) pals.push_back(ra2engine::pal_for_color(s.pal, k - 10));
+    std::vector<std::shared_ptr<std::array<ra2engine::FacingSet, 3>>> built(n);
+    for (auto& b : built) b = std::make_shared<std::array<ra2engine::FacingSet, 3>>();
+    auto part = [&](int pi, const ra2assets::VxlModel& m, const ra2assets::HvaModel& h) {
+        std::vector<ra2engine::FacingSet> sets(n);
+        ra2engine::build_facing_sets(m, h, nf, s.vpl, pals.data(), n, sets.data(), 0, nf);
+        for (int i = 0; i < n; ++i) (*built[i])[pi] = std::move(sets[i]);
+    };
+    part(0, s.hull, s.hull_h);
+    if (va.has_turret) part(1, s.tur, s.tur_h);
+    if (va.has_barrel) part(2, s.barl, s.barl_h);
+    std::lock_guard<std::mutex> lk(g_vxl_mu);
+    for (int i = 0; i < n; ++i) {
+        auto& slot = va.color_sets[todo[i]];
+        if (!slot) slot = std::move(built[i]);
+    }
+}
+#endif
 // W2-GA-12: the hull's ground shadow at facing bi (built once per type).
 const ra2engine::VoxelSprite* vxl_shadow(const VehicleAssets& va, int bi) {
     if (!va.vsrc) return nullptr;
@@ -8247,12 +8283,11 @@ private:
             int n = 0;
 #ifdef __SWITCH__
             std::vector<std::function<void()>> jobs;   // this thread (core 2) + core 1
-            for (int k : keys)
-                for (const VehicleAssets* va : list)
-                    if (va) {
-                        jobs.push_back([this, va, k]() { if (!prewarm_stop_) vxl_prewarm(*va, k); });
-                        ++n;
-                    }
+            for (const VehicleAssets* va : list)   // one job per vehicle: every colour from one rasterization
+                if (va) {
+                    jobs.push_back([this, va, &keys]() { if (!prewarm_stop_) vxl_prewarm_colors(*va, keys); });
+                    n += static_cast<int>(keys.size());
+                }
             ra2_switch_parallel(jobs, {1});
             if (prewarm_stop_) return;
 #else
