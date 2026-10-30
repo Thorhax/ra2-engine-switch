@@ -7,6 +7,8 @@
 
 namespace ra2engine {
 
+unsigned g_texture_creates = 0;
+
 static std::uint64_t g_next_cache_id = 1;
 
 TextureCache::TextureCache(void* sdl_renderer) : renderer_(sdl_renderer), id_(g_next_cache_id++) {}
@@ -134,6 +136,7 @@ void* TextureCache::get(const std::string& key, const uint8_t* indices, int w,
     if (!tex) {
         throw std::runtime_error(SDL_GetError());
     }
+    ++g_texture_creates;
 
     SDL_UpdateTexture(tex, nullptr, rgba.data(), w * 4);
     SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
@@ -174,6 +177,7 @@ void* TextureCache::get_rgba(const std::string& key, const uint8_t* rgba, int w,
     if (!tex) {
         throw std::runtime_error(SDL_GetError());
     }
+    ++g_texture_creates;
 
     SDL_UpdateTexture(tex, nullptr, rgba, w * 4);
     SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);

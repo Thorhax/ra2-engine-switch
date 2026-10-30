@@ -90,6 +90,10 @@ Switch-only optimizations (each behind `__SWITCH__`):
   dir instead of per vehicle (0.64 s).
 - **Voxel prewarm** (per house colour, after loading) runs on cores 1–2, one job per vehicle that rasterizes each
   facing once for every colour in the match: 11 s → 2.0 s.
+- **Campaign voxel prewarm**: a mission configures its houses after the scene's prewarm call, so the prewarm found
+  no houses and every vehicle's first draw in a house colour rasterized its set on the spot (Dreadnought 241 ms,
+  a truck 204 ms). It starts again after the mission setup and also builds the hull shadows. Allied 1's first
+  frame: 586 ms → 242 ms (its 105 new textures); the later 170–220 ms hitches are gone.
 - **Building anims** are read on the loading screen instead of in the first game tick (a 390 ms hitch).
 - **Shroud with allied sight** (`World::step_visibility`, all platforms, same result): campaign maps share sight
   between allied houses, and the merge copied and OR-ed every house's grid byte by byte each tick (3.1 ms of a

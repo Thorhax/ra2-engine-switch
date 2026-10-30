@@ -104,9 +104,12 @@ void perf_frame(double in_ms, double up_ms, double ren_ms, double pre_ms) {
     if (P.win_start == 0) P.win_start = P.log_start = now;
     const double total = in_ms + up_ms + ren_ms + pre_ms;
 #ifdef __SWITCH__
+    static unsigned s_tex_seen = 0;   // textures created since the previous frame
+    const unsigned tex_new = ::ra2engine::g_texture_creates - s_tex_seen;
+    s_tex_seen = ::ra2engine::g_texture_creates;
     if (total > 100.0)   // a hitch: which phase took it
-        SDL_Log("[perf] slow frame %.1fms: input=%.1f update=%.1f render=%.1f present=%.1f ticks=%d", total, in_ms,
-                up_ms, ren_ms, pre_ms, ticks);
+        SDL_Log("[perf] slow frame %.1fms: input=%.1f update=%.1f render=%.1f present=%.1f ticks=%d textures=%u", total,
+                in_ms, up_ms, ren_ms, pre_ms, ticks, tex_new);
 #endif
     ++P.frames; P.logic += ticks;
     P.t_input += in_ms; P.t_update += up_ms; P.t_render += ren_ms; P.t_present += pre_ms;

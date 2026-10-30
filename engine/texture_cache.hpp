@@ -8,6 +8,9 @@
 
 namespace ra2engine {
 
+// Textures TextureCache has created so far (the Switch [perf] slow-frame log).
+extern unsigned g_texture_creates;
+
 // Palettizes indexed (8-bit) image buffers into RGBA and caches the result
 // as an SDL_Texture, keyed by an asset+frame identifier string. Kept
 // SDL-free in the header (renderer/texture handles are passed/returned as

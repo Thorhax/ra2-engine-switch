@@ -3677,10 +3677,12 @@ void vxl_prewarm(const VehicleAssets& va, int key) {
     if (!slot) slot = std::move(built);
 }
 #ifdef __SWITCH__
+const ra2engine::VoxelSprite* vxl_shadow(const VehicleAssets& va, int bi);
 // vxl_prewarm for several colours at once: each facing is rasterized once and
 // coloured per key (build_facing_sets), the sets the draw path built first kept.
 void vxl_prewarm_colors(const VehicleAssets& va, const std::vector<int>& keys) {
     if (!va.vsrc) return;
+    vxl_shadow(va, 0);   // builds all the hull's shadow facings (else ~80 ms on the first draw)
     std::vector<int> todo;
     {
         std::lock_guard<std::mutex> lk(g_vxl_mu);
@@ -6862,6 +6864,13 @@ public:
             wire_building_deaths(world_, ba_, rules_, rules_ini_);   // P4: the mission's barrels
             gf_arm_mcv(world_, ba_, rules_, /*skirmish_session=*/false);   // gF: MCVs deploy
             gf_load_assets({});
+#ifdef __SWITCH__
+            // The mission configured its houses (and added its vehicles to
+            // vlist_) after the constructor's prewarm call, which therefore
+            // returned at once; each vehicle's first draw in a house colour then
+            // rasterized its set on the spot (200+ ms for a Dreadnought).
+            start_vxl_prewarm();
+#endif
         }
         p5_art_ = load_p5_art(dir_, ra2_);
         g_p5_art = &p5_art_;
@@ -8269,6 +8278,7 @@ private:
     void start_vxl_prewarm() {
         load_progress("VOXEL PREWARM");   // W2-AR-02 loading-screen checkpoint
         if (!world_.houses_configured()) return;
+        if (prewarm_.joinable()) return;   // already running (Switch: the campaign's second call)
         std::vector<int> keys;
         for (int h = 0; h < world_.house_count(); ++h) {
             const int k = 10 + world_.house_color(h);
