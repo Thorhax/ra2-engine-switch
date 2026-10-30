@@ -36,3 +36,4 @@
 /build-switch-stock/
 /switch/rig/rig.env
 __pycache__/
+dist/

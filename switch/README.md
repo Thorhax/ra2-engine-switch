@@ -18,6 +18,15 @@ RA2_DKP_IMAGE=devkitpro/devkita64:latest switch/build.sh   # -> build-switch-sto
 `switch/switch.cmake` picks the Mesa link line by itself (the Mesa 26 `.pc`
 files omit its NVK/NAK/NIL archives, so they are listed explicitly).
 
+## Package
+
+```sh
+switch/package.sh build-switch-stock   # -> dist/ra2engine-switch-<git describe>.zip (Mesa 26: build-switch, -mesa26)
+```
+
+The zip unpacks onto the SD root (`switch/ra2engine/ra2engine.nro`, `INSTALL.txt`, `LICENSE`) and holds no game
+files. `switch/icon.jpg` is the hbmenu icon.
+
 ## Install
 
 ```
