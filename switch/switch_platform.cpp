@@ -6,6 +6,7 @@
 #include <switch.h>
 
 #include <atomic>
+#include <malloc.h>
 #include <cstdio>
 #include <cstdlib>
 #include <sys/stat.h>
@@ -17,6 +18,16 @@ constexpr const char* kLogFile = RA2_SWITCH_BASE_DIR "save/ra2engine.log";
 }  // namespace
 
 char* ra2_switch_base_path() { return SDL_strdup(RA2_SWITCH_BASE_DIR); }
+
+unsigned long long ra2_switch_mem_used() {
+    return mallinfo().uordblks;   // the heap in use (libnx reserves the whole heap up front)
+}
+
+unsigned long long ra2_switch_mem_total() {
+    u64 v = 0;
+    svcGetInfo(&v, InfoType_TotalMemorySize, CUR_PROCESS_HANDLE, 0);
+    return v;
+}
 
 void ra2_switch_pin_thread(int core) {
     svcSetThreadCoreMask(CUR_THREAD_HANDLE, core, 1u << core);

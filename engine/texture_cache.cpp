@@ -37,9 +37,12 @@ void TextureCache::pin(const std::string& key) {
     if (it != cache_.end()) it->second.pinned = true;
 }
 
-void TextureCache::unpin(const std::string& key) {
+void TextureCache::erase(const std::string& key) {
     auto it = cache_.find(key);
-    if (it != cache_.end()) it->second.pinned = false;
+    if (it == cache_.end()) return;
+    SDL_DestroyTexture(static_cast<SDL_Texture*>(it->second.tex));
+    bytes_ -= it->second.bytes;
+    cache_.erase(it);
 }
 
 void TextureCache::clear() {

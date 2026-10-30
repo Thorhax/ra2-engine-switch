@@ -354,7 +354,9 @@ std::vector<std::string> g_atlas_keys;   // the current list's pages (pinned)
 
 void build_terrain_atlas(TextureCache& tc, Theater& theater, const ra2assets::Palette& pal,
                          std::vector<TerrainSlot>& slots, uint64_t build) {
-    for (const std::string& k : g_atlas_keys) tc.unpin(k);   // the previous list's pages
+    // The previous list's pages: new keys every build, so free them now
+    // (left to the budget LRU they piled up ~12 MB per match).
+    for (const std::string& k : g_atlas_keys) tc.erase(k);
     g_atlas_keys.clear();
     // Every tile image and every cliff / slope extra of the list's slots.
     struct Img { size_t slot; bool extra; ra2assets::TileImage img; const ra2assets::Palette* p; };

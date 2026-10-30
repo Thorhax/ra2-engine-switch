@@ -124,6 +124,10 @@ void perf_frame(double in_ms, double up_ms, double ren_ms, double pre_ms) {
                 "worst=%.1fms canvas=%dx%d",
                 P.log_frames / lwin, P.log_logic / lwin, P.l_input / n, P.l_update / n, P.l_render / n,
                 P.l_present / n, P.l_worst, g_ui_w, g_ui_h);
+#ifdef __SWITCH__
+        SDL_Log("[perf] mem used=%lluMB of %lluMB", static_cast<unsigned long long>(ra2_switch_mem_used() >> 20),
+                static_cast<unsigned long long>(ra2_switch_mem_total() >> 20));
+#endif
         P.log_frames = P.log_logic = 0;
         P.l_input = P.l_update = P.l_render = P.l_present = P.l_worst = 0;
         P.log_start = now;
