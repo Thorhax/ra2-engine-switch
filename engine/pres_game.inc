@@ -1134,6 +1134,9 @@ private:
                 if (radar_event(3, cx, cy)) {
                     snd_.eva("EVA_OurBaseIsUnderAttack");
                     snd_.play(base_attack_siren_, 0.0, "base under attack");
+#ifdef __SWITCH__
+                    ra2_switch_rumble(0.6f, 350);   // the controller feels the alarm too
+#endif
                 }
                 const double half = 0.5 * b.max_hp;
                 if (p.hp > half && b.hp <= half) snd_.play_at(building_damage_, cx, cy, "half strength");

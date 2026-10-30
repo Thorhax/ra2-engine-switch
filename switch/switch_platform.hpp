@@ -19,6 +19,8 @@ char* ra2_switch_pref_path();
 // so plain std::threads share core 0 with the main thread. These pin the
 // calling thread to an application core (0..2; 3 belongs to the system).
 void ra2_switch_pin_thread(int core);
+// A short rumble on every open controller (0..1 strength).
+void ra2_switch_rumble(float strength, int ms);
 // Heap in use / the process's memory, in bytes (the [perf] log line).
 unsigned long long ra2_switch_mem_used();
 unsigned long long ra2_switch_mem_total();

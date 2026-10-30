@@ -29,6 +29,13 @@ unsigned long long ra2_switch_mem_total() {
     return v;
 }
 
+void ra2_switch_rumble(float strength, int ms) {
+    const Uint16 v = static_cast<Uint16>(strength * 0xFFFF);
+    for (int i = 0; i < SDL_NumJoysticks(); ++i)
+        if (SDL_Joystick* j = SDL_JoystickFromInstanceID(SDL_JoystickGetDeviceInstanceID(i)))
+            SDL_JoystickRumble(j, v, v, static_cast<Uint32>(ms));
+}
+
 void ra2_switch_pin_thread(int core) {
     svcSetThreadCoreMask(CUR_THREAD_HANDLE, core, 1u << core);
 }
@@ -85,6 +92,8 @@ extern "C" void userAppInit(void) {
     setenv("mesa_glthread", "false", 1);
     // Applet mode (album launch) leaves the homebrew a few hundred MB; the
     // engine streams ~1 GB of .mix archives and wants title takeover.
+    std::fprintf(stderr, "[switch] %s mode\n",
+                 appletGetOperationMode() == AppletOperationMode_Console ? "docked" : "handheld");
     const AppletType at = appletGetAppletType();
     if (at != AppletType_Application && at != AppletType_SystemApplication)
         std::fprintf(stderr, "[switch] WARNING: running in applet mode (limited memory); "
