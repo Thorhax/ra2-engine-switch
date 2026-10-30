@@ -293,14 +293,16 @@ void SwitchGamepad::tick(uint32_t now) {
         SDL_Joystick* j = SDL_JoystickFromInstanceID(SDL_JoystickGetDeviceInstanceID(i));
         if (!j) continue;
         float x, y, raw;
-        stick(j, kAxisLX, kAxisLY, x, y, raw);
-        if (x || y) { lx = x; ly = y; l_raw = raw; }
+        // lx/ly = the panning stick (the physical RIGHT stick), rx/ry = the
+        // cursor stick (the physical LEFT stick).
         stick(j, kAxisRX, kAxisRY, x, y, raw);
+        if (x || y) { lx = x; ly = y; l_raw = raw; }
+        stick(j, kAxisLX, kAxisLY, x, y, raw);
         if (x || y) { rx = x; ry = y; }
     }
     if (debug_ && (lx || ly || rx || ry) && now - last_log_ >= 250 && (last_log_ = now))
         std::fprintf(stderr, "[pad] sticks %.2f %.2f / %.2f %.2f cursor %.0f,%.0f\n", lx, ly, rx, ry, cx_, cy_);
-    // Right stick: the cursor.
+    // Left stick: the cursor.
     if (rx || ry) {
         const float v = kCursorSpeed * w_ * dt;
         move_cursor(std::clamp(cx_ + rx * v, 0.0f, w_ - 1.0f), std::clamp(cy_ + ry * v, 0.0f, h_ - 1.0f), now);
@@ -313,7 +315,7 @@ void SwitchGamepad::tick(uint32_t now) {
             emit_pointer(InputEvent::PointerMove, InputEvent::Left, now);
         }
     }
-    // Left stick: scroll the map, faster with the stick on its rim.
+    // Right stick: scroll the map, faster with the stick on its rim.
     if (lx || ly) {
         const float boost = l_raw > 0.97f ? kPanEdgeBoost : 1.0f;
         // Pan's dx/dy is a finger drag (the map follows it): pushing the
