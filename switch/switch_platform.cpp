@@ -81,6 +81,7 @@ extern "C" void userAppInit(void) {
         std::setvbuf(stdout, nullptr, _IOLBF, 0);
     }
     nifmInitialize(NifmServiceType_User);
+    romfsInit();   // romfs:/fonts (switch/switch_text.cpp)
     // HOME -> Close must not kill the process mid-frame: a Mesa 26 (NVK/zink)
     // app killed that way left the GPU wedged (black screen, home menu
     // included, until a reboot). With exit locked the close arrives as an
@@ -101,6 +102,7 @@ extern "C" void userAppInit(void) {
 }
 
 extern "C" void userAppExit(void) {
+    romfsExit();
     nifmExit();
     socketExit();
     appletUnlockExit();

@@ -61,6 +61,14 @@ struct ShellPainter {
     void text(const std::string& s, int lx, int ly, int lw, int lh, int align,
               const ra2assets::Palette* pal, const char* keypfx, double logical_px) const {
         if (!fnt() || !pal || s.empty()) return;
+#ifdef __SWITCH__
+        if (sw_text_enabled()) {   // DejaVu at the box's scale (switch/switch_text.hpp)
+            const ra2assets::Rgba c = (*pal)[1];
+            sw_text_box(ren, s, dev(lx, ly, lw, lh), align,
+                        static_cast<int>(std::lround(xf.s * logical_px * 1.05)), SDL_Color{c.r, c.g, c.b, 255});
+            return;
+        }
+#endif
         const ra2assets::Font& f = *art.font;
         // 12metfnt cell = 16 px; snap to an integer glyph scale (fractional
         // nearest-neighbour scaling visibly mangles the 1-px bevel strokes).

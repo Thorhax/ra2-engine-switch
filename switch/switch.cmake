@@ -14,7 +14,7 @@
 set(RA2_SWITCH_PORTLIBS "${DEVKITPRO}/portlibs/switch")
 
 add_library(ra2engine_obj OBJECT ${RA2_ENGINE_SOURCES} engine/audio_sdl.cpp
-    switch/switch_platform.cpp switch/switch_gamepad.cpp)
+    switch/switch_platform.cpp switch/switch_gamepad.cpp switch/switch_text.cpp)
 target_compile_definitions(ra2engine_obj PRIVATE RA2_VERSION="${RA2_VERSION}")
 # Q3: no FMA contraction, so float paths match the desktop / Android builds.
 target_compile_options(ra2engine_obj PRIVATE -ffp-contract=off -Wall -Wextra)
@@ -48,7 +48,8 @@ else()
   message(STATUS "Switch: linking stock switch-mesa")
   set(RA2_SWITCH_GL_LIBS EGL GLESv2 glapi)
 endif()
-target_link_libraries(ra2engine PRIVATE ra2assets SDL2 ${RA2_SWITCH_GL_LIBS}
+# SDL2_ttf (switch/switch_text.cpp) and its FreeType / HarfBuzz stack.
+target_link_libraries(ra2engine PRIVATE ra2assets SDL2_ttf harfbuzz freetype bz2 png z SDL2 ${RA2_SWITCH_GL_LIBS}
     drm_nouveau stdc++ nx m pthread)
 
 if (NOT RA2_VERSION_BASE)
@@ -63,4 +64,5 @@ set(_ra2_nro_icon)
 if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/switch/icon.jpg")
   set(_ra2_nro_icon ICON "${CMAKE_CURRENT_SOURCE_DIR}/switch/icon.jpg")
 endif()
-nx_create_nro(ra2engine NACP ra2engine.nacp ${_ra2_nro_icon})
+# romfs: DejaVu Sans (+ its licence) for the menu / HUD text.
+nx_create_nro(ra2engine NACP ra2engine.nacp ${_ra2_nro_icon} ROMFS "${CMAKE_CURRENT_SOURCE_DIR}/switch/romfs")

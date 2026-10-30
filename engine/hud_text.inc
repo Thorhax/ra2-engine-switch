@@ -99,6 +99,25 @@ void hud_text(SDL_Renderer* ren, ra2engine::TextureCache& tc, const std::string&
         draw_text(ren, s, x - (align == kHudCenter ? static_cast<int>(s.size()) * 3 : 0), y, 1, col.r, col.g, col.b);
         return;
     }
+#ifdef __SWITCH__
+    if (sw_text_enabled()) {   // DejaVu Sans at the bitmap font's line height (switch/switch_text.hpp)
+        const int px = std::max(10, static_cast<int>(std::lround(hud_line_h() * scale * 0.95)));
+        size_t st = 0;
+        int ln_i = 0;
+        while (st <= s.size()) {
+            size_t nl = s.find('\n', st);
+            if (nl == std::string::npos) nl = s.size();
+            const std::string ln = s.substr(st, nl - st);
+            const int w = sw_text_width(ln, px);
+            const int lx = align == kHudCenter ? x - w / 2 : align == kHudRight ? x - w : x;
+            sw_text_draw(ren, ln, lx, y + static_cast<int>(std::lround(ln_i * hud_line_h() * scale)), px, col, shadow);
+            if (nl >= s.size()) break;
+            st = nl + 1;
+            ++ln_i;
+        }
+        return;
+    }
+#endif
     size_t start = 0;
     int line = 0;
     while (start <= s.size()) {

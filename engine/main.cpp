@@ -39,6 +39,7 @@ static char* ra2_cli_pref_path() {
 // switch-sdl2 has no filesystem backend (both calls return NULL): use the
 // SD-card folder of the .nro (switch/switch_platform.hpp).
 #include "switch_platform.hpp"
+#include "switch_text.hpp"   // DejaVu menu / HUD text
 #define SDL_GetBasePath() ra2_switch_base_path()
 #define SDL_GetPrefPath(org, app) ra2_switch_pref_path()
 #endif
@@ -5219,7 +5220,26 @@ SDL_Texture* shp_frame_tex(ra2engine::TextureCache& tc, const std::string& key,
 // brief flagged. So draw_fnt_text is given a SYNTHETIC ramp palette built here:
 // index 0 transparent (handled by TextureCache::get), 1.. mapped to a warm
 // metallic gold gradient that reads as the RA2 bevelled menu face.
+#ifdef __SWITCH__
+// Switch: 12metfnt's shade 1 is most of each letter's body and 2..4 its bevel
+// highlights. On the ramp below shade 1 is a dim tone that blends the 1-px strokes
+// together on a 1280x720 handheld screen; here the body is the full colour and the
+// highlights lighter still, so the letters read solid.
+ra2assets::Palette make_font_palette_solid(int r, int g, int b) {
+    ra2assets::Palette p;
+    auto toward_white = [](int c, int pct) { return static_cast<uint8_t>(c + (255 - c) * pct / 100); };
+    for (int i = 0; i < 256; ++i) {
+        const int pct = i <= 1 ? 0 : i == 2 ? 45 : 78;
+        p[i] = ra2assets::Rgba{toward_white(r, pct), toward_white(g, pct), toward_white(b, pct), 255};
+    }
+    p[0] = ra2assets::Rgba{0, 0, 0, 0};
+    return p;
+}
+#endif
 ra2assets::Palette make_font_palette() {
+#ifdef __SWITCH__
+    return make_font_palette_solid(255, 235, 140);   // the gold face
+#endif
     ra2assets::Palette p;
     for (int i = 0; i < 256; ++i) {
         int lvl = 40 + i * 55;                 // 1->95, 2->150, 3->205, 4->255...
@@ -5235,6 +5255,9 @@ ra2assets::Palette make_font_palette() {
 // [P8 / options.md §4] The same shade ramp, but toward a solid control colour
 // (the shell's control text is yellow 0x00FFFF, disabled dark red 0x00009F).
 ra2assets::Palette make_font_palette_tinted(int r, int g, int b) {
+#ifdef __SWITCH__
+    return make_font_palette_solid(r, g, b);
+#endif
     ra2assets::Palette p;
     for (int i = 0; i < 256; ++i) {
         int lvl = 40 + i * 55;
@@ -6556,6 +6579,16 @@ void draw_shell(SDL_Renderer* ren, ra2engine::TextureCache& tc, const MenuArt& a
         auto centered = [&](const std::string& s, int lx, int ly, int lw, int lh,
                             int gscale, int ldx = 0, int ldy = 0) {
             SDL_Rect box = dev(lx, ly, lw, lh);
+#ifdef __SWITCH__
+            if (sw_text_enabled()) {   // DejaVu Sans Bold (switch/switch_text.hpp)
+                const ra2assets::Rgba c = (*art.font_pal)[1];
+                box.x += static_cast<int>(std::lround(ldx * canvas_scale));
+                box.y += static_cast<int>(std::lround(ldy * canvas_scale));
+                sw_text_box(ren, s, box, 1, static_cast<int>(std::lround(f.height() * gscale * 1.1)),
+                            SDL_Color{c.r, c.g, c.b, 255}, true, true);
+                return;
+            }
+#endif
             int tw = fnt_text_width(f, s) * gscale;
             while (gscale > 1 && tw > box.w) { --gscale; tw = fnt_text_width(f, s) * gscale; }
             const int th = f.height() * gscale;

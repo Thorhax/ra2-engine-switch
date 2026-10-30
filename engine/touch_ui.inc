@@ -15,7 +15,13 @@ int touch_mode() const {
 // --- W6-01-12: HUD message / objective / tooltip text is drawn 1.5x on a
 // touch canvas (game.fnt's 13-row cells are ~8 dp tall at 1:1 on a phone);
 // a mouse keeps the original 1:1. Cameo captions are baked into the art.
+#ifdef __SWITCH__
+// Switch: a whole-number scale. game.fnt is a pixel font, and at 1.5x its glyphs came
+// out uneven and ran together with their shadows; at 2x each pixel is a clean 2x2 block.
+double hud_touch_scale() const { return (touch_ui_ && !mouse_present_) ? 2.0 : 1.0; }
+#else
 double hud_touch_scale() const { return (touch_ui_ && !mouse_present_) ? 1.5 : 1.0; }
+#endif
 
 bool touch_banner_visible() const {
     return touch_ui_ && !mouse_present_ && touch_mode() != 0 && !menu_.open_ && !sld_.is_open() &&

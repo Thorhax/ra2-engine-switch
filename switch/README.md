@@ -43,8 +43,8 @@ The log warns when it runs in applet mode.
 
 | Input | Action |
 |---|---|
-| Left stick | Pan the map (quadratic; about twice as fast with the stick on its rim) |
-| Right stick | Cursor (quadratic) |
+| Left stick | Cursor (quadratic) |
+| Right stick | Pan the map (quadratic; about twice as fast with the stick on its rim) |
 | A | Select / order (move, attack, harvest, enter...). Twice: every visible unit of that type |
 | B | Cancel / deselect; cancels building placement |
 | Y | Hold and move the cursor: selection box. Tap: every combat unit |
@@ -63,6 +63,13 @@ The log warns when it runs in applet mode.
 | Touch screen (handheld) | The touch controls (tap, drag, CMD column); the controller's cursor hides them again |
 
 The engine has no escort command (Ctrl+Alt) and no waypoint mode, so ZL + A is attack-move.
+
+## Text
+
+Menu and HUD text is drawn in DejaVu Sans (`switch/romfs/fonts`, SDL2_ttf; `switch/switch_text.cpp`): the game's
+8-px bitmap fonts, laid out for 640x480 and scaled 1.5x, blur together on the handheld screen. Each label takes the
+largest size its box allows. An empty file `sdmc:/switch/ra2engine/classic_font` keeps the original fonts (drawn
+with solid strokes and the HUD at a whole 2x scale).
 
 ## Hardware status (2026-10-30, Atmosphère, hbmenu title takeover)
 
