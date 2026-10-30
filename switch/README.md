@@ -65,7 +65,7 @@ The engine has no escort command (Ctrl+Alt) and no waypoint mode, so ZL + A is a
 | Load time, default 1v1 | 11.2 s (was 22.5 s) | 11.7 s |
 | First frame of a match | 0.35 s (was 7.9 s) | 0.32 s |
 | Campaign: intro movie, briefing, Allied mission 1 | 60 fps (was 45–50); load 12.4 s | not run |
-| Campaign: Soviet mission 1 (Washington, 155x155) | 55–57 fps; load 11.9 s | not run |
+| Campaign: Soviet mission 1 (Washington, 155x155) | 55–57 fps; load 9.0 s (was 13.6 s) | not run |
 | HOME → Close | clean | clean once exit is locked (see below) |
 
 Switch-only optimizations (each behind `__SWITCH__`):
@@ -75,6 +75,10 @@ Switch-only optimizations (each behind `__SWITCH__`):
   2048x2048 pages instead. It also trims steady render time.
 - **Vehicle loading** (`load_vehicle_assets`): `rulesmd.ini` / `artmd.ini` are parsed once instead of once per
   vehicle (7.3 s), and each vehicle's facing sets are built on cores 0–2 (`ra2_switch_parallel`).
+- **Vehicle facings**: each of the 32 facings is rasterized once and coloured for both house palettes
+  (`build_facing_sets`; only the palette lookup differed), as (part x half) jobs on three cores: 4.1 s → 2.1 s for
+  Soviet 1's 65 vehicles. The death explosions (conquer.mix / cache.mix, the SHPs, anim.pal) are read once per data
+  dir instead of per vehicle (0.64 s).
 - **Voxel prewarm** (per house colour, after loading) runs on cores 1–2: 11 s → 5.7 s.
 - **Building anims** are read on the loading screen instead of in the first game tick (a 390 ms hitch).
 - **Shroud with allied sight** (`World::step_visibility`, all platforms, same result): campaign maps share sight

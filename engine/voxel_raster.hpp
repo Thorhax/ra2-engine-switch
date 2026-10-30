@@ -45,6 +45,21 @@ VoxelSprite rasterize_model(const ra2assets::VxlModel& m, const ra2assets::HvaMo
                             const ra2assets::Palette& pal, int hva_frame = 0,   // W3-B HVA frame
                             double pitch_rad = 0.0);   // W4: nose-up pitch (rockets / voxel bullets)
 
+// rasterize_model up to the palette: each covered pixel's palette index
+// (`mask` 1 = covered). The geometry, lighting and depth test do not depend on
+// the palette, so one indexed sprite serves every house colour.
+struct VoxelIndexSprite {
+    int w = 0, h = 0;
+    int anchor_x = 0, anchor_y = 0;
+    std::vector<uint8_t> index;  // w*h palette indices
+    std::vector<uint8_t> mask;   // w*h, 1 = covered
+};
+VoxelIndexSprite rasterize_model_indexed(const ra2assets::VxlModel& m, const ra2assets::HvaModel& hva,
+                                         double yaw_rad, const ra2assets::Vpl& vpl, int hva_frame = 0,
+                                         double pitch_rad = 0.0);
+// The RGBA sprite of an indexed one through `pal` (rasterize_model's output).
+VoxelSprite colorize(const VoxelIndexSprite& s, const ra2assets::Palette& pal);
+
 // W2-GA-12 [RE: voxel-render.md fn table, FUN_00755680 -- the VoxLib shadow
 // renderer plots every projected column in colour 1 (shadow) at GROUND
 // level]: the model's silhouette with each voxel's height flattened to z=0,

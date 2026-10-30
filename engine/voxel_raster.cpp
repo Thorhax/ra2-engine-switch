@@ -78,11 +78,35 @@ double index_to_yaw(int i, int n) {
 VoxelSprite rasterize_model(const ra2assets::VxlModel& m, const ra2assets::HvaModel& hva,
                             double yaw_rad, const ra2assets::Vpl& vpl,
                             const ra2assets::Palette& pal, int hva_frame, double pitch_rad) {
+    return colorize(rasterize_model_indexed(m, hva, yaw_rad, vpl, hva_frame, pitch_rad), pal);
+}
+
+VoxelSprite colorize(const VoxelIndexSprite& s, const ra2assets::Palette& pal) {
+    VoxelSprite out;
+    out.w = s.w;
+    out.h = s.h;
+    out.anchor_x = s.anchor_x;
+    out.anchor_y = s.anchor_y;
+    out.rgba.assign(s.index.size() * 4, 0);
+    for (size_t at = 0; at < s.index.size(); ++at) {
+        if (!s.mask[at]) continue;
+        const ra2assets::Rgba col = pal[s.index[at]];
+        out.rgba[at * 4 + 0] = col.r;
+        out.rgba[at * 4 + 1] = col.g;
+        out.rgba[at * 4 + 2] = col.b;
+        out.rgba[at * 4 + 3] = 255;
+    }
+    return out;
+}
+
+VoxelIndexSprite rasterize_model_indexed(const ra2assets::VxlModel& m, const ra2assets::HvaModel& hva,
+                                         double yaw_rad, const ra2assets::Vpl& vpl, int hva_frame,
+                                         double pitch_rad) {
     const double c = std::cos(yaw_rad), s = std::sin(yaw_rad);
     const double cp = pitch_rad == 0.0 ? 1.0 : std::cos(pitch_rad);
     const double sp = pitch_rad == 0.0 ? 0.0 : std::sin(pitch_rad);
 
-    VoxelSprite out;
+    VoxelIndexSprite out;
     if (m.sections.empty() || hva.frames.empty() || hva.frames[0].empty()) return out;
     // W3-B: the HVA frame (rotor / propeller anims); 0 = the old behaviour.
     const std::size_t hf = static_cast<std::size_t>(hva_frame < 0 ? 0 : hva_frame) % hva.frames.size();
@@ -111,7 +135,8 @@ VoxelSprite rasterize_model(const ra2assets::VxlModel& m, const ra2assets::HvaMo
     out.h = static_cast<int>(std::ceil(mxy - mny)) + 2 * pad + 1;
     out.anchor_x = static_cast<int>(std::round(-mnx)) + pad;
     out.anchor_y = static_cast<int>(std::round(-mny)) + pad;
-    out.rgba.assign(static_cast<size_t>(out.w) * out.h * 4, 0);
+    out.index.assign(static_cast<size_t>(out.w) * out.h, 0);
+    out.mask.assign(static_cast<size_t>(out.w) * out.h, 0);
     std::vector<double> zbuf(static_cast<size_t>(out.w) * out.h,
                              -std::numeric_limits<double>::infinity());
 
@@ -146,7 +171,7 @@ VoxelSprite rasterize_model(const ra2assets::VxlModel& m, const ra2assets::HvaMo
                     const int px = static_cast<int>(std::round(sx)) + out.anchor_x;
                     const int py = static_cast<int>(std::round(sy)) + out.anchor_y;
                     const int lv = light_level(v.normal, sec.normals_mode, vpl.section_count, L, H);
-                    const ra2assets::Rgba col = pal[vpl.tables[lv][v.color]];
+                    const uint8_t col = vpl.tables[lv][v.color];
                     // 2x1 footprint (voxel-render.md §1).
                     for (int dx = 0; dx < 2; ++dx) {
                         const int qx = px + dx, qy = py;
@@ -154,10 +179,8 @@ VoxelSprite rasterize_model(const ra2assets::VxlModel& m, const ra2assets::HvaMo
                         const size_t at = static_cast<size_t>(qy) * out.w + qx;
                         if (depth <= zbuf[at]) continue;
                         zbuf[at] = depth;
-                        out.rgba[at * 4 + 0] = col.r;
-                        out.rgba[at * 4 + 1] = col.g;
-                        out.rgba[at * 4 + 2] = col.b;
-                        out.rgba[at * 4 + 3] = 255;
+                        out.index[at] = col;
+                        out.mask[at] = 1;
                     }
                 }
     }

@@ -18,4 +18,12 @@ FacingSet build_facing_set(const ra2assets::VxlModel& m, const ra2assets::HvaMod
                            int n_facings, const ra2assets::Vpl& vpl,
                            const ra2assets::Palette& pal);
 
+// build_facing_set for several palettes at once (house colours): each facing
+// is rasterized once and coloured per palette. Facings [first, last) only, so
+// callers can split the work; `out` holds one set per palette, each sized
+// n_facings (resized here when empty).
+void build_facing_sets(const ra2assets::VxlModel& m, const ra2assets::HvaModel& hva, int n_facings,
+                       const ra2assets::Vpl& vpl, const ra2assets::Palette* pals, int n_pals,
+                       FacingSet* out, int first, int last);
+
 }  // namespace ra2engine

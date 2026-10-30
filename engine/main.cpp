@@ -1942,26 +1942,31 @@ VehicleAssets load_vehicle_assets(const std::string& dir, const ra2assets::MixFi
             va.vsrc = src;
         }
 #ifdef __SWITCH__
-        {   // Switch: the (house x part) facing sets are independent; build
-            // them on the three application cores (most of a vehicle's load).
+        {   // Switch: each facing is rasterized once for both house palettes
+            // (only the final palette lookup differs), and the (part x half of
+            // the facings) jobs run on the three application cores.
             const ra2assets::Palette hps[2] = {ra2engine::pal_for_house(unit_pal, 0),
                                                ra2engine::pal_for_house(unit_pal, 1)};
+            const int nf = ra2engine::kVehicleFacings;
+            ra2engine::FacingSet hull_sets[2], tur_sets[2], barl_sets[2];
             std::vector<std::function<void()>> jobs;
-            for (int house = 0; house <= 1; ++house) {
-                const ra2assets::Palette& hp = hps[house];
-                jobs.push_back([&, house] {
-                    va.hull[house] = ra2engine::build_facing_set(hull_m, hull_h, ra2engine::kVehicleFacings, vpl, hp);
-                });
-                if (va.has_turret)
-                    jobs.push_back([&, house] {
-                        va.turret[house] = ra2engine::build_facing_set(tur_m, tur_h, ra2engine::kVehicleFacings, vpl, hp);
+            auto add_part = [&](const ra2assets::VxlModel& pm, const ra2assets::HvaModel& ph, ra2engine::FacingSet* sets) {
+                for (int half = 0; half < 2; ++half)
+                    jobs.push_back([&vpl, &hps, nf, m = &pm, h = &ph, sets, half] {
+                        ra2engine::build_facing_sets(*m, *h, nf, vpl, hps, 2, sets, half * nf / 2, (half + 1) * nf / 2);
                     });
-                if (va.has_barrel)
-                    jobs.push_back([&, house] {
-                        va.barrel[house] = ra2engine::build_facing_set(barl_m, barl_h, ra2engine::kVehicleFacings, vpl, hp);
-                    });
-            }
+            };
+            for (ra2engine::FacingSet* sets : {hull_sets, tur_sets, barl_sets})   // sized up front: the halves share them
+                for (int house = 0; house < 2; ++house) sets[house].sprites.resize(nf);
+            add_part(hull_m, hull_h, hull_sets);
+            if (va.has_turret) add_part(tur_m, tur_h, tur_sets);
+            if (va.has_barrel) add_part(barl_m, barl_h, barl_sets);
             ra2_switch_parallel(jobs);
+            for (int house = 0; house < 2; ++house) {
+                va.hull[house] = std::move(hull_sets[house]);
+                if (va.has_turret) va.turret[house] = std::move(tur_sets[house]);
+                if (va.has_barrel) va.barrel[house] = std::move(barl_sets[house]);
+            }
         }
 #else
         for (int house = 0; house <= 1; ++house) {
@@ -1983,6 +1988,62 @@ VehicleAssets load_vehicle_assets(const std::string& dir, const ra2assets::MixFi
         // (tank simply vanishes) but does NOT fail the whole vehicle load.
         va.explosion_image = rules.explosion_first(unit_id);
         va.explosion_pal = unit_pal;
+#ifdef __SWITCH__
+        if (!va.explosion_image.empty()) {
+            // Switch: the same few explosions serve every vehicle; open
+            // conquer.mix / cache.mix and decode each SHP and anim.pal once per
+            // data dir instead of per vehicle (~10 ms each). Same results and
+            // the same log line when an SHP is missing.
+            struct ExplosionCache {
+                std::optional<MixFile> conquer;
+                std::string conquer_err;
+                bool pal_tried = false;
+                std::optional<Palette> anim_pal;
+                std::map<std::string, std::pair<std::shared_ptr<ShpFile>, std::string>> shps;   // shp or error
+            };
+            static std::map<std::string, ExplosionCache> s_expl;
+            ExplosionCache& ec = s_expl[dir];
+            if (!ec.conquer && ec.conquer_err.empty()) {
+                try {
+                    ec.conquer.emplace(ra2.open_nested("conquer.mix"));
+                } catch (const std::exception& ex) {
+                    ec.conquer_err = ex.what();
+                }
+            }
+            auto it = ec.shps.find(va.explosion_image);
+            if (it == ec.shps.end()) {
+                std::pair<std::shared_ptr<ShpFile>, std::string> e;
+                if (!ec.conquer) {
+                    e.second = ec.conquer_err;
+                } else {
+                    try {
+                        e.first = std::make_shared<ShpFile>(load_unit_shp(*ec.conquer, va.explosion_image));
+                    } catch (const std::exception& ex) {
+                        e.second = ex.what();
+                    }
+                }
+                it = ec.shps.emplace(va.explosion_image, std::move(e)).first;
+            }
+            if (it->second.first) {
+                va.explosion = std::make_unique<ShpFile>(*it->second.first);
+                if (!ec.pal_tried) {
+                    ec.pal_tried = true;
+                    try {
+                        MixFile cache = ra2.open_nested("cache.mix");
+                        const MixEntry* ape = cache.find(std::string("anim.pal"));
+                        if (ape) {
+                            auto apal = cache.read(*ape);
+                            ec.anim_pal.emplace(Palette::load(apal.data(), apal.size()));
+                        }
+                    } catch (const std::exception&) { /* keep unit pal */ }
+                }
+                if (ec.anim_pal) va.explosion_pal = *ec.anim_pal;
+            } else {
+                std::cerr << "[vehicle] explosion SHP unavailable: " << it->second.second << "\n";
+                va.explosion.reset();
+            }
+        }
+#else
         if (!va.explosion_image.empty()) {
             try {
                 MixFile conquer = ra2.open_nested("conquer.mix");
@@ -2001,6 +2062,7 @@ VehicleAssets load_vehicle_assets(const std::string& dir, const ra2assets::MixFi
                 va.explosion.reset();
             }
         }
+#endif
 
         va.ok = true;
         const auto& hs = hull_m.sections.empty() ? ra2assets::VxlSection{} : hull_m.sections[0];

@@ -1,5 +1,6 @@
 #include "doctest.h"
 #include "voxel_raster.hpp"
+#include "facing_cache.hpp"
 #include "ra2assets/vxl.hpp"
 #include "ra2assets/hva.hpp"
 #include "ra2assets/vpl.hpp"
@@ -234,4 +235,42 @@ TEST_CASE("voxel_raster: real htnk hull renders deterministically") {
     // screen). Re-pin ONLY with a new visual check. Observed sprite: w=61 h=43
     // opaque=1038 anchor=(27,24).
     CHECK(fnv1a(s1.rgba) == 1209756769u);  // 0x481b6c61
+}
+
+TEST_CASE("voxel_raster: build_facing_sets matches build_facing_set per palette") {
+    // A 3x2x2 block with varied colours / normals, so facings overlap and the
+    // depth test decides pixels.
+    VxlModel m;
+    VxlSection sec;
+    sec.name = "T";
+    sec.size_x = 3; sec.size_y = 2; sec.size_z = 2;
+    sec.scale = 1.0f;
+    for (int r = 0; r < 3; ++r) for (int c = 0; c < 4; ++c) sec.transform[r][c] = (r == c) ? 1.f : 0.f;
+    for (int a = 0; a < 3; ++a) { sec.min_bounds[a] = -6.0f; sec.max_bounds[a] = 6.0f; }
+    sec.normals_mode = 4;
+    for (int i = 0; i < 12; ++i)
+        sec.voxels.push_back({static_cast<uint8_t>(16 + i * 17), static_cast<uint8_t>(i * 20), i != 5});
+    m.sections.push_back(sec);
+    const HvaModel h = identity_hva();
+    const ra2assets::Vpl vpl = identity_vpl();
+    ra2assets::Palette pals[2] = {gray_pal(), gray_pal()};
+    for (int i = 0; i < 256; ++i) pals[1][i] = ra2assets::Rgba{static_cast<uint8_t>(255 - i), static_cast<uint8_t>(i), 7, 255};
+    const int n = ra2engine::kVehicleFacings;
+    ra2engine::FacingSet sets[2];
+    ra2engine::build_facing_sets(m, h, n, vpl, pals, 2, sets, 0, n / 2);
+    ra2engine::build_facing_sets(m, h, n, vpl, pals, 2, sets, n / 2, n);
+    for (int p = 0; p < 2; ++p) {
+        const ra2engine::FacingSet ref = ra2engine::build_facing_set(m, h, n, vpl, pals[p]);
+        REQUIRE(sets[p].sprites.size() == ref.sprites.size());
+        for (int i = 0; i < n; ++i) {
+            const ra2engine::VoxelSprite& a = sets[p].sprites[i];
+            const ra2engine::VoxelSprite& b = ref.sprites[i];
+            CHECK(a.w == b.w);
+            CHECK(a.h == b.h);
+            CHECK(a.anchor_x == b.anchor_x);
+            CHECK(a.anchor_y == b.anchor_y);
+            CHECK(a.rgba == b.rgba);
+            CHECK(opaque_count(a) > 0);
+        }
+    }
 }
