@@ -3660,12 +3660,40 @@ void World::step_visibility() {
     // harbour at f3 and started 'Bad Guy 3 Startup' through such a chain).
     if (houses_configured_ && ally_reveal_) {
         const int n = house_count();
-        // Own sight, this frame. The snapshot buffers are reused across steps
-        // (assign keeps the capacity) and the grids are OR-ed a word at a time:
-        // copying and merging ~n grids byte by byte was most of a campaign tick.
+        // Own sight, this frame. Each house's sight this step lies within the
+        // rows its buildings' and units' discs span (all rows after a full-map
+        // reveal; the gap passes only clear cells), so only those rows are
+        // snapshotted and OR-ed, a word at a time, into the snapshot buffers
+        // reused across steps. On a 270x270 map with 16 houses, OR-ing whole
+        // grids for every allied pair was most of a campaign tick.
+        std::vector<std::pair<int, int>> rows((size_t)n, {grid_h_, -1});   // [lo, hi], empty when lo > hi
+        auto span = [&](int h, int y0, int y1) {
+            if (h < 0 || h >= n) return;
+            rows[(size_t)h].first = std::min(rows[(size_t)h].first, std::max(0, y0));
+            rows[(size_t)h].second = std::max(rows[(size_t)h].second, std::min(grid_h_ - 1, y1));
+        };
+        for (const Building& b : buildings_) {
+            if (!b.alive || b.state == Building::State::Dead) continue;
+            const int r = b.sight < 0 ? 0 : b.sight;
+            span(b.house, b.cy - r, b.cy + b.fh - 1 + r);
+        }
+        for (const Unit& u : units_) {
+            if (!u.alive) continue;
+            const int r = u.sight < 0 ? 0 : u.sight;
+            span(u.house, u.cell_y - r, u.cell_y + r);
+        }
+        for (int h = 0; h < n; ++h)
+            if (map_reveal_[h] || (observer_reveal_ && house_defeated(h) && is_human(h))) span(h, 0, grid_h_ - 1);
         static thread_local std::vector<std::vector<std::uint8_t>> vis_src;
         vis_src.resize(visible_.size());
-        for (size_t h = 0; h < visible_.size(); ++h) vis_src[h].assign(visible_[h].begin(), visible_[h].end());
+        for (size_t h = 0; h < visible_.size(); ++h) {
+            vis_src[h].resize(visible_[h].size());
+            if (h < rows.size() && rows[h].first <= rows[h].second && visible_[h].size() == (size_t)grid_w_ * grid_h_) {
+                const size_t off = (size_t)rows[h].first * grid_w_;
+                const size_t len = (size_t)(rows[h].second - rows[h].first + 1) * grid_w_;
+                std::memcpy(vis_src[h].data() + off, visible_[h].data() + off, len);
+            }
+        }
         auto or_into = [](std::uint8_t* dst, const std::uint8_t* src, size_t len) {
             size_t i = 0;
             for (; i + 8 <= len; i += 8) {
@@ -3682,9 +3710,12 @@ void World::step_visibility() {
             for (int b = 0; b < n; ++b) {
                 if (a == b || !are_allied(b, a)) continue;
                 if (b >= (int)vis_src.size() || vis_src[b].size() != explored_[a].size()) continue;
-                const size_t len = explored_[a].size();
-                or_into(explored_[a].data(), vis_src[b].data(), len);
-                if (visible_[a].size() == len) or_into(visible_[a].data(), vis_src[b].data(), len);
+                if (rows[(size_t)b].first > rows[(size_t)b].second) continue;   // b sees nothing this step
+                if (explored_[a].size() != (size_t)grid_w_ * grid_h_) continue;
+                const size_t off = (size_t)rows[(size_t)b].first * grid_w_;
+                const size_t len = (size_t)(rows[(size_t)b].second - rows[(size_t)b].first + 1) * grid_w_;
+                or_into(explored_[a].data() + off, vis_src[b].data() + off, len);
+                if (visible_[a].size() == explored_[a].size()) or_into(visible_[a].data() + off, vis_src[b].data() + off, len);
             }
         }
     }

@@ -75,6 +75,7 @@ The engine has no escort command (Ctrl+Alt) and no waypoint mode, so ZL + A is a
 | First frame of a match | 0.35 s (was 7.9 s) | 0.32 s |
 | Campaign: intro movie, briefing, Allied mission 1 | 60 fps (was 45–50); load 12.4 s | not run |
 | Campaign: Soviet mission 1 (Washington, 155x155) | 55–57 fps; load 9.0 s (was 13.6 s) | not run |
+| Campaign: Allied mission 7 (`--campaign all07smd.map`, 270x270, 16 houses) | 60 fps at 1x speed; load 10.9 s; world step 4.3 ms (was 8.1) | not run |
 | HOME → Close | clean | clean once exit is locked (see below) |
 
 Switch-only optimizations (each behind `__SWITCH__`):
@@ -99,7 +100,8 @@ Switch-only optimizations (each behind `__SWITCH__`):
   between allied houses, and the merge copied and OR-ed every house's grid byte by byte each tick (3.1 ms of a
   5.4 ms world step on Allied 1). It now reuses the snapshot buffers and ORs a word at a time (0.3 ms). Buildings
   reveal their footprint as one rounded rectangle (`reveal_rect`) instead of one disc per footprint cell, and that
-  building sight is cached until a building appears, dies, moves or changes house.
+  building sight is cached until a building appears, dies, moves or changes house. The merge only copies and ORs the rows
+  each house's buildings and units can see (Allied 7, 68 allied pairs on a 270x270 map: 4.9 ms → 1.1 ms).
 - The `[perf]` log (`--fps`) also splits the logic tick (`tick campaign/world/pres/rest`) and `World::step`
   (`world units/vis/...`) and names frames over 100 ms (`slow frame`).
 - Horizon threads stay on their creator's core unless pinned: `ra2_switch_pin_thread` /
