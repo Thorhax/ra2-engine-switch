@@ -3573,21 +3573,57 @@ void World::step_visibility() {
         map_reveal_[b.house] = true;
     }
     // 1) Clear visible_ (explored_ is sticky -- fog no-regrow §4).
-    for (int h = 0; h < house_count(); ++h)
-        if (!visible_[h].empty())
-            std::fill(visible_[h].begin(), visible_[h].end(), (std::uint8_t)0);
+    // 3) Reveal from every ALIVE building, ONCE PER FOOTPRINT CELL (§3).
+    //    Reveals only ever set cells, so the order of 2) and 3) is free. The
+    //    buildings' sight is stamped into bld_sight_ (each footprint as one
+    //    reveal_rect union) and rebuilt only when a sighted footprint appears,
+    //    dies, moves or changes house; each tick copies it into visible_ and
+    //    ORs it into explored_ (which a reshroud may have cleared).
+    {
+        std::uint64_t key = 1469598103934665603ull;   // FNV-1a over what the stamp reads
+        auto mix = [&key](std::int64_t v) { key = (key ^ static_cast<std::uint64_t>(v)) * 1099511628211ull; };
+        mix(grid_w_); mix(grid_h_); mix(house_count());
+        for (std::size_t h = 0; h < visible_.size(); ++h) mix(static_cast<std::int64_t>(visible_[h].size()));
+        for (std::size_t i = 0; i < buildings_.size(); ++i) {
+            const Building& b = buildings_[i];
+            if (!b.alive || b.state == Building::State::Dead) continue;
+            mix(static_cast<std::int64_t>(i)); mix(b.house); mix(b.cx); mix(b.cy); mix(b.fw); mix(b.fh); mix(b.sight);
+        }
+        if (key != bld_sight_key_ || bld_sight_.size() != visible_.size()) {
+            bld_sight_key_ = key;
+            bld_sight_.resize(visible_.size());
+            for (std::size_t h = 0; h < visible_.size(); ++h) bld_sight_[h].assign(visible_[h].size(), 0);
+            std::vector<std::uint8_t> scratch;
+            for (const Building& b : buildings_) {
+                if (!b.alive || b.state == Building::State::Dead) continue;
+                if (b.house < 0 || b.house >= house_count() || visible_[b.house].empty()) continue;
+                std::vector<std::uint8_t>& g = bld_sight_[(std::size_t)b.house];
+                scratch.resize(g.size());
+                reveal_rect(scratch, g, grid_w_, grid_h_, b.cx, b.cy, b.fw, b.fh, b.sight);
+            }
+        }
+        for (int h = 0; h < house_count(); ++h) {
+            if (visible_[h].empty()) continue;
+            const std::vector<std::uint8_t>& g = bld_sight_[(std::size_t)h];
+            std::memcpy(visible_[h].data(), g.data(), g.size());
+            std::uint8_t* e = explored_[h].data();
+            const std::uint8_t* src = g.data();
+            const std::size_t len = std::min(g.size(), explored_[h].size());
+            std::size_t i = 0;
+            for (; i + 8 <= len; i += 8) {
+                std::uint64_t d, w;
+                std::memcpy(&d, e + i, 8);
+                std::memcpy(&w, src + i, 8);
+                d |= w;
+                std::memcpy(e + i, &d, 8);
+            }
+            for (; i < len; ++i) e[i] |= src[i];
+        }
+    }
     // 2) Reveal from every ALIVE unit (near-circular, radius = its sight).
     for (const Unit& u : units_) {
         if (!u.alive) continue;
         reveal_source(u.house, u.cell_x, u.cell_y, u.sight);
-    }
-    // 3) Reveal from every ALIVE building, ONCE PER FOOTPRINT CELL (§3).
-    //    The footprint's discs are stamped as one union (reveal_rect): the same
-    //    cells, without fw*fh overlapping passes.
-    for (const Building& b : buildings_) {
-        if (!b.alive || b.state == Building::State::Dead) continue;
-        if (b.house < 0 || b.house >= house_count() || visible_[b.house].empty()) continue;
-        reveal_rect(explored_[b.house], visible_[b.house], grid_w_, grid_h_, b.cx, b.cy, b.fw, b.fh, b.sight);
     }
     // Wave-5 (R-044): enemy Gap Generators shroud their radius (world_w5.cpp).
     w5_gap_pass(0);

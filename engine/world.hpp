@@ -2967,6 +2967,10 @@ private:
     // enable_shroud).
     std::vector<std::vector<std::uint8_t>> explored_;
     std::vector<std::vector<std::uint8_t>> visible_;
+    // step_visibility: each house's building sight, kept while the set of
+    // sighted footprints (bld_sight_key_) is unchanged. Derived; NOT hashed or saved.
+    std::vector<std::vector<std::uint8_t>> bld_sight_;
+    std::uint64_t bld_sight_key_ = 0;
     bool fog_of_war_ = false;   // W2-GA-03: FogOfWar scenario flag (default off)
     bool shroud_any_ = false;   // the step_visibility firewall (opened by
                                 // enable_shroud); false in every existing gate.

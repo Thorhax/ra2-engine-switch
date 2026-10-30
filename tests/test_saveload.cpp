@@ -288,7 +288,8 @@ TEST_CASE("saveload: every World / MapTriggerSystem data member is visited (sour
         // W9-05: econ_rules_ is hashed through econ_rules_digest_ (visited).
         {"/engine/world.hpp", "class World {", "w.",
          {"map_", "econ_rules_", "order_issuer_", "econ_launches_",
-          "team_flags_"}},   // fv7c: scratch, rebuilt at the head of every step_missions_w7
+          "team_flags_",     // fv7c: scratch, rebuilt at the head of every step_missions_w7
+          "bld_sight_", "bld_sight_key_"}},   // step_visibility's building-sight cache (keyed on the buildings)
         {"/engine/map_trigger.hpp", "class MapTriggerSystem {", "s.", {"d_"}},
         // W9-05: the other SaveAccess classes -- every member is saved AND
         // (visited with save::io) in the sync hash.

@@ -5919,6 +5919,9 @@ int run_scene_driver(ra2engine::Platform& plat, ra2engine::TextureCache& tc, Sce
     std::unique_ptr<Scene> scene(initial);
     ra2engine::EventSource& events = src ? *src : static_cast<ra2engine::EventSource&>(plat);
     Uint32 prev = SDL_GetTicks();
+#ifdef __SWITCH__
+    Uint64 sw_prev_pc = SDL_GetPerformanceCounter();   // the frame clock (see the dt below)
+#endif
     int frame = 0;
     g_platform = &plat;
     // R-184: --record writes this run's events + time steps; --replay
@@ -5990,7 +5993,17 @@ int run_scene_driver(ra2engine::Platform& plat, ra2engine::TextureCache& tc, Sce
             scene->handle(ev);
         }
         const Uint32 now = SDL_GetTicks();
+#ifdef __SWITCH__
+        // SDL_GetTicks counts whole ms (a 16.67 ms frame reads as 16 or 17 ms), which
+        // jitters the 60 Hz logic accumulator; the frame clock uses the
+        // high-resolution counter instead.
+        const Uint64 sw_now_pc = SDL_GetPerformanceCounter();
+        const double sw_dt = static_cast<double>(sw_now_pc - sw_prev_pc) / static_cast<double>(SDL_GetPerformanceFrequency());
+        sw_prev_pc = sw_now_pc;
+        const double dt = replay ? replay->dt() : fixed_dt > 0.0 ? fixed_dt : sw_dt;
+#else
         const double dt = replay ? replay->dt() : fixed_dt > 0.0 ? fixed_dt : (now - prev) / 1000.0;
+#endif
         prev = now;
         if (rec) rec->frame(frame, dt);
         const Uint64 pc1 = SDL_GetPerformanceCounter();
@@ -6026,6 +6039,9 @@ int run_scene_driver(ra2engine::Platform& plat, ra2engine::TextureCache& tc, Sce
                 scene.reset();
                 scene.reset(build_deferred(*d, plat, tc, /*show_screen=*/hooks == nullptr));
                 prev = SDL_GetTicks();   // the load is not game time
+#ifdef __SWITCH__
+                sw_prev_pc = SDL_GetPerformanceCounter();
+#endif
             } else {
                 scene.reset(nx);
             }
