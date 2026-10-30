@@ -21,6 +21,13 @@
 #include "capture.hpp"        // grants_startup_from_neutral, kNeutralHouse (Capture phase)
 #include "roster2.hpp"        // naval_exit_cell (gap owner A: real-play Naval Yard)
 
+#include <cstring>  // std::memcpy (AllyReveal word OR)
+#include <chrono>   // Switch perf log (World::step stages)
+#ifdef __SWITCH__
+#include "switch_platform.hpp"
+double g_sw_world_ms[10] = {};
+#endif
+
 namespace ra2engine {
 
 // W2-SK-16 A* expansion budgets (closed nodes).
@@ -3575,11 +3582,12 @@ void World::step_visibility() {
         reveal_source(u.house, u.cell_x, u.cell_y, u.sight);
     }
     // 3) Reveal from every ALIVE building, ONCE PER FOOTPRINT CELL (§3).
+    //    The footprint's discs are stamped as one union (reveal_rect): the same
+    //    cells, without fw*fh overlapping passes.
     for (const Building& b : buildings_) {
         if (!b.alive || b.state == Building::State::Dead) continue;
-        for (int fy = 0; fy < b.fh; ++fy)
-            for (int fx = 0; fx < b.fw; ++fx)
-                reveal_source(b.house, b.cx + fx, b.cy + fy, b.sight);
+        if (b.house < 0 || b.house >= house_count() || visible_[b.house].empty()) continue;
+        reveal_rect(explored_[b.house], visible_[b.house], grid_w_, grid_h_, b.cx, b.cy, b.fw, b.fh, b.sight);
     }
     // Wave-5 (R-044): enemy Gap Generators shroud their radius (world_w5.cpp).
     w5_gap_pass(0);
@@ -3616,16 +3624,31 @@ void World::step_visibility() {
     // harbour at f3 and started 'Bad Guy 3 Startup' through such a chain).
     if (houses_configured_ && ally_reveal_) {
         const int n = house_count();
-        const std::vector<std::vector<std::uint8_t>> vis_src = visible_;   // own sight, this frame
+        // Own sight, this frame. The snapshot buffers are reused across steps
+        // (assign keeps the capacity) and the grids are OR-ed a word at a time:
+        // copying and merging ~n grids byte by byte was most of a campaign tick.
+        static thread_local std::vector<std::vector<std::uint8_t>> vis_src;
+        vis_src.resize(visible_.size());
+        for (size_t h = 0; h < visible_.size(); ++h) vis_src[h].assign(visible_[h].begin(), visible_[h].end());
+        auto or_into = [](std::uint8_t* dst, const std::uint8_t* src, size_t len) {
+            size_t i = 0;
+            for (; i + 8 <= len; i += 8) {
+                std::uint64_t d, w;
+                std::memcpy(&d, dst + i, 8);
+                std::memcpy(&w, src + i, 8);
+                d |= w;
+                std::memcpy(dst + i, &d, 8);
+            }
+            for (; i < len; ++i) dst[i] |= src[i];
+        };
         for (int a = 0; a < n; ++a) {
             if (a >= (int)explored_.size() || explored_[a].empty()) continue;
             for (int b = 0; b < n; ++b) {
                 if (a == b || !are_allied(b, a)) continue;
                 if (b >= (int)vis_src.size() || vis_src[b].size() != explored_[a].size()) continue;
-                for (size_t i = 0; i < explored_[a].size(); ++i) {
-                    explored_[a][i] |= vis_src[b][i];
-                    if (!visible_[a].empty()) visible_[a][i] |= vis_src[b][i];
-                }
+                const size_t len = explored_[a].size();
+                or_into(explored_[a].data(), vis_src[b].data(), len);
+                if (visible_[a].size() == len) or_into(visible_[a].data(), vis_src[b].data(), len);
             }
         }
     }
@@ -5829,7 +5852,21 @@ void World::ai_fill_trigger_view(int house, const HouseAiRec& rec,
     }
 }
 
+#ifdef __SWITCH__
+#define RA2_SW_WLAP(part) sw_wlap(part)
+#else
+#define RA2_SW_WLAP(part) ((void)0)
+#endif
+
 void World::step(double dt) {
+#ifdef __SWITCH__
+    auto sw_t = std::chrono::steady_clock::now();
+    auto sw_wlap = [&sw_t](int part) {
+        const auto t = std::chrono::steady_clock::now();
+        g_sw_world_ms[part] += std::chrono::duration<double, std::milli>(t - sw_t).count();
+        sw_t = t;
+    };
+#endif
     // W6-03-04: arm the damage -> anger feed for this step (computer houses
     // only; a strict no-op otherwise), disarmed on every exit.
     struct FeedGuard {
@@ -5926,6 +5963,7 @@ void World::step(double dt) {
         scatter.erase(std::unique(scatter.begin(), scatter.end()), scatter.end());
         for (int s : scatter) order_scatter(s, /*cell_push=*/true);
     }
+    RA2_SW_WLAP(0);   // units (movement)
 
     // P5 Crates [RE: veterancy.md C4/C5]: pickup by any unit now standing on a
     // crate cell, then lifetime expiry -> relocation. A pure INSERTION;
@@ -5938,6 +5976,7 @@ void World::step(double dt) {
     // movement and before combat reads it (via seen_by_mask). Firewalled behind
     // shroud_any_ (false in every existing demo -> a strict no-op).
     step_visibility();
+    RA2_SW_WLAP(1);   // crates, playfield, visibility
 
     // CB-1 Transports/Cargo [RE: transport-cargo.md]: boarding resolves the
     // frame the passenger lands adjacent; ejects claim occupancy before
@@ -5968,6 +6007,7 @@ void World::step(double dt) {
     step_flight(dt);
 
     step_air_naval(dt);   // W2-AN: subs/sonar, spawners, fixed-wing, crashes (world_an.cpp)
+    RA2_SW_WLAP(2);   // cargo .. air/naval
 
     // CB-4 Superweapons [RE: superweapon.md §3]: advance each granted house's
     // recharge timer. A pure INSERTION after step_flight; `if (!sw_any_) return;`
@@ -6018,7 +6058,9 @@ void World::step(double dt) {
     // launched this frame first moves next frame -- §6.3 "detonates on the next
     // Update"); `if (!projectiles_enabled_) return;` inside is the only cost
     // every existing demo pays (none calls enable_projectiles).
+    RA2_SW_WLAP(3);   // superweapons .. repair/sell
     step_projectiles(dt);
+    RA2_SW_WLAP(4);   // projectiles
 
     // P2 firewall: the launch sink is passed ONLY when projectiles are enabled;
     // nullptr keeps step_combat's instant-hit path byte-identical.
@@ -6028,6 +6070,7 @@ void World::step(double dt) {
                                                       &combat_rng_);   // G-50 ROF jitter
     for (const ProjectileLaunch& l : launches)
         launch_projectile(l.attacker, l.target_unit, l.target_building);
+    RA2_SW_WLAP(5);   // combat
     // Gap fix C: a FireEvent for every unit that fired this step (try_fire /
     // the building branch stamp fire_flash = 0.4 exactly at the shot).
     for (int i = 0; i < static_cast<int>(units_.size()); ++i) {
@@ -6158,6 +6201,7 @@ void World::step(double dt) {
     // w7fix-combat: retaliation / call for help / damage scatter / Harmless
     // wake from this step's hits, and the idle Area Guard default.
     step_missions_w7();
+    RA2_SW_WLAP(6);   // building combat .. missions
 
     // Economy phase [RE: economy.md]: ore growth/spread + harvester mission
     // stepping, gated on set_economy having been called (types_ non-empty).
@@ -6409,6 +6453,7 @@ void World::step(double dt) {
     // the existing production/economy step, and ONLY when a house is
     // AI-flagged. The five demo scripts flag no AI house, so ai_any_ stays
     // false and this is a no-op -> byte-identical to before this phase.
+    RA2_SW_WLAP(7);   // economy, unit passes
     if (!house_repair_delay_.empty()) step_ai_repair(dt);   // fv7c: unarmed computer houses
     if (ai_any_) {
         step_ai_houses(dt);
@@ -6416,6 +6461,7 @@ void World::step(double dt) {
                             // fixed deterministic order [RE: ai-team.md; spec §5]
         step_ai_unit_rules();   // W7: auto-deploy + ToProtect (ai_unit.cpp)
     }
+    RA2_SW_WLAP(8);   // AI
 
     // Multi-house [RE: multihouse.md §5]: evaluate last-team-standing victory
     // AFTER combat has resolved this frame's deaths. Firewalled behind
@@ -6435,7 +6481,9 @@ void World::step(double dt) {
     // (every byte-identity gate).
     if (!econ_.empty()) step_player_economies(dt);
     step_house_outcomes();
+    RA2_SW_WLAP(9);   // abilities .. outcomes
 }
+#undef RA2_SW_WLAP
 
 std::vector<int> unit_draw_order(const std::vector<Unit>& units) {
     std::vector<int> order;

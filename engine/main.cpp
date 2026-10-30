@@ -7021,6 +7021,17 @@ public:
         // sequence) order [RE: Queue_AI -> Execute_DoList FUN_0064BDF0 before
         // the frame's logic].
         apply_due_commands();
+#ifdef __SWITCH__
+        auto sw_t = std::chrono::steady_clock::now();
+        auto sw_lap = [&sw_t](int part) {
+            const auto t = std::chrono::steady_clock::now();
+            g_sw_tick_ms[part] += std::chrono::duration<double, std::milli>(t - sw_t).count();
+            sw_t = t;
+        };
+#define RA2_SW_LAP(part) sw_lap(part)
+#else
+#define RA2_SW_LAP(part) ((void)0)
+#endif
         // (L2: the repair wallet bridge and the spy wallet hint are gone -- the
         // human wallet is the World's HouseEcon, charged and stolen from in
         // the sim [RE: repair-sell.md §A2/§A3; HouseClass has one Balance].)
@@ -7033,13 +7044,16 @@ public:
         }
         campaign_audio_pump();   // W2-CA-12: trigger speech/sound/music
         campaign_visuals_pump();   // W3-FX: trigger anims/camera/radar/particles/flashes
+        RA2_SW_LAP(0);
         world_.step(dt);   // L2: every human house's production runs inside the step
+        RA2_SW_LAP(1);
         pres_.note_launches(world_, world_.take_econ_launches());   // W7-12-01: EVA_UnitReady per launch (drained per tick)
         r210_track_steps();   // R-210 --play probes (scene-side, never saved)
         // wave-5 (R-042): spy-stolen tech unlocks -- the sidebar's copy of the
         // local roster (the World gates each house's own copy in its step).
         world_.apply_stolen_tech_gate(ur_.defs, local_house_);
         pres_.logic_tick(world_, ba_, lcredits(), world_.take_projectile_events());   // W3-B: anim clock, building slots, effects per logic tick
+        RA2_SW_LAP(2);
         world_.clear_frag_events();   // W7-12-07: the fragment beams were drawn by this tick's logic_tick
         rp_after_world_step();   // gap owner A: SW grant/revoke by building (G-25)
         gf_update(dt);   // gF: deploy EVA + skirmish game over
@@ -7086,6 +7100,8 @@ public:
         if (net_) net_drain_tick_events();   // NET-PLAY: frame-time events leave the World per tick
         ++sim_frame_;   // NET L1: the command clock
         if (net_) net_note_tick(net_t0);   // W9-01-03: PROCESS_TIME sample (no waits)
+        RA2_SW_LAP(3);
+#undef RA2_SW_LAP
         }   // G-13 fixed logic tick
         if (net_) {   // NET-PLAY: no catch-up (W9-01-05); chat / away / leaving
             logic_acc_ = std::min(logic_acc_, kLogicDt);

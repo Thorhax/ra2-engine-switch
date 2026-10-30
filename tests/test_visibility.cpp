@@ -52,3 +52,21 @@ TEST_CASE("visibility: reveal_disc clips at grid edge [RE: shroud.md §3]") {
     CHECK(v[0] == 0 + 1);            // (0,0) set
     CHECK(v[5 * gw + 5] == 0);       // (5,5): 25+25=50>25 not in range anyway
 }
+
+TEST_CASE("visibility: reveal_rect equals a reveal_disc per footprint cell") {
+    const int gw = 30, gh = 24;
+    struct Case { int cx, cy, fw, fh, sight; };
+    const Case cases[] = {{10, 10, 1, 1, 5}, {10, 8, 4, 3, 6}, {0, 0, 3, 3, 7}, {27, 21, 3, 3, 4},
+                          {-2, 5, 4, 2, 3}, {12, 12, 2, 5, 0}, {5, 5, 3, 3, -1}, {14, 10, 6, 6, 10}};
+    for (const Case& c : cases) {
+        std::vector<std::uint8_t> e1(gw * gh, 0), v1(gw * gh, 0), e2(gw * gh, 0), v2(gw * gh, 0);
+        for (int fy = 0; fy < c.fh; ++fy)
+            for (int fx = 0; fx < c.fw; ++fx) reveal_disc(e1, v1, gw, gh, c.cx + fx, c.cy + fy, c.sight);
+        const int n = reveal_rect(e2, v2, gw, gh, c.cx, c.cy, c.fw, c.fh, c.sight);
+        CHECK(v1 == v2);
+        CHECK(e1 == e2);
+        int set = 0;
+        for (std::uint8_t b : v2) set += b;
+        CHECK(n == set);
+    }
+}

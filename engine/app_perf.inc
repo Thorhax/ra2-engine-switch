@@ -49,6 +49,10 @@ struct PerfMeter {
 };
 PerfMeter g_perf;
 int g_perf_logic_ticks = 0;   // GameScene's logic loop counts its ticks here
+#ifdef __SWITCH__
+// The logic tick's parts (campaign, world step, presentation, the rest), summed over the log window.
+double g_sw_tick_ms[4] = {};
+#endif
 
 std::string perf_ini_value(const char* key) {
     const std::string path = data_dir_ini_path();
@@ -99,6 +103,11 @@ void perf_frame(double in_ms, double up_ms, double ren_ms, double pre_ms) {
     PerfMeter& P = g_perf;
     if (P.win_start == 0) P.win_start = P.log_start = now;
     const double total = in_ms + up_ms + ren_ms + pre_ms;
+#ifdef __SWITCH__
+    if (total > 100.0)   // a hitch: which phase took it
+        SDL_Log("[perf] slow frame %.1fms: input=%.1f update=%.1f render=%.1f present=%.1f ticks=%d", total, in_ms,
+                up_ms, ren_ms, pre_ms, ticks);
+#endif
     ++P.frames; P.logic += ticks;
     P.t_input += in_ms; P.t_update += up_ms; P.t_render += ren_ms; P.t_present += pre_ms;
     P.worst = std::max(P.worst, total);
@@ -127,6 +136,21 @@ void perf_frame(double in_ms, double up_ms, double ren_ms, double pre_ms) {
 #ifdef __SWITCH__
         SDL_Log("[perf] mem used=%lluMB of %lluMB", static_cast<unsigned long long>(ra2_switch_mem_used() >> 20),
                 static_cast<unsigned long long>(ra2_switch_mem_total() >> 20));
+        if (P.log_logic > 0) {
+            const double n = P.log_logic;
+            SDL_Log("[perf] tick campaign=%.2fms world=%.2fms pres=%.2fms rest=%.2fms", g_sw_tick_ms[0] / n,
+                    g_sw_tick_ms[1] / n, g_sw_tick_ms[2] / n, g_sw_tick_ms[3] / n);
+        }
+        if (P.log_logic > 0) {
+            const double n = P.log_logic;
+            const double* w = g_sw_world_ms;
+            SDL_Log("[perf] world units=%.2f vis=%.2f cargo-air=%.2f sw-repair=%.2f proj=%.2f combat=%.2f "
+                    "missions=%.2f econ=%.2f ai=%.2f tail=%.2f",
+                    w[0] / n, w[1] / n, w[2] / n, w[3] / n, w[4] / n, w[5] / n, w[6] / n, w[7] / n, w[8] / n,
+                    w[9] / n);
+        }
+        for (double& v : g_sw_tick_ms) v = 0;
+        for (double& v : g_sw_world_ms) v = 0;
 #endif
         P.log_frames = P.log_logic = 0;
         P.l_input = P.l_update = P.l_render = P.l_present = P.l_worst = 0;

@@ -22,4 +22,12 @@ int reveal_disc(std::vector<std::uint8_t>& explored,
                 std::vector<std::uint8_t>& visible,
                 int gw, int gh, int cx, int cy, int sight);
 
+// The union of reveal_disc over every cell of the fw x fh footprint at (cx,cy),
+// in one pass: a cell is in range when its offset from the NEAREST footprint
+// cell passes cell_in_sight (that cell minimises dx2+dy2 over the rectangle).
+// Same grids and result as fw*fh reveal_disc calls; returns the cells set.
+int reveal_rect(std::vector<std::uint8_t>& explored,
+                std::vector<std::uint8_t>& visible,
+                int gw, int gh, int cx, int cy, int fw, int fh, int sight);
+
 }  // namespace ra2engine

@@ -28,3 +28,5 @@ unsigned long long ra2_switch_mem_total();
 // `worker_cores` and returns when all are done. The jobs must be independent.
 void ra2_switch_parallel(const std::vector<std::function<void()>>& jobs,
                          const std::vector<int>& worker_cores = {1, 2});
+// World::step's stages for the [perf] log (summed per log window; world.cpp).
+extern double g_sw_world_ms[10];
