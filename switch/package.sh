@@ -8,6 +8,7 @@ build="${1:-build-switch-stock}"
 nro="$root/$build/ra2engine.nro"
 [ -f "$nro" ] || { echo "no $nro (run switch/build.sh first)" >&2; exit 1; }
 version="$(git -C "$root" describe --tags --always 2>/dev/null || cat "$root/VERSION")"
+version="${version#switch-}"   # tag switch-v1.0.0 -> ra2engine-switch-v1.0.0.zip
 suffix=""
 [ "$build" = build-switch ] && suffix="-mesa26"
 name="ra2engine-switch-${version}${suffix}"
