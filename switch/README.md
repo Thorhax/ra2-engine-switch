@@ -4,6 +4,30 @@ Native libnx build of the engine through devkitPro's `switch-sdl2`. It needs a
 Switch that runs homebrew (Atmosphère + hbmenu) and your own Red Alert 2 /
 Yuri's Revenge game files.
 
+## Quick start (release zip)
+
+1. Download `ra2engine-switch-<version>.zip` from the
+   [Releases](https://github.com/Thorhax/ra2-engine-switch/releases) page (the `-mesa26` zip is an experimental
+   build on a newer GPU driver; the plain one is recommended).
+2. Unzip it onto the root of the SD card. That creates `sdmc:/switch/ra2engine/ra2engine.nro`.
+3. Copy every `.mix` and `.csf` file from your own Red Alert 2 / Yuri's Revenge install folder into
+   `sdmc:/switch/ra2engine/` (about 1 GB; the movie mixes are optional). No game data is included.
+4. Hold **R** while launching any game, then pick **RA2 Engine** in the homebrew menu (title takeover, needed for the
+   memory; see [Install](#install)).
+
+## What works
+
+- The Allied and Soviet campaigns (movies, briefings, objectives), skirmish against the AI, save / load.
+- 1280x720, docked and handheld, at 60 fps in skirmish and most missions (see [Hardware status](#hardware-status)).
+- A full controller scheme ([Controls](#controls)) on the Joy-Cons or a Pro Controller, with rumble when your base
+  is under attack.
+- Touch in handheld mode: the engine's touch controls (tap, drag-select, the CMD column) appear on the first touch
+  and hide again when the controller's cursor moves.
+- Readable menu and HUD text in DejaVu Sans ([Text](#text)).
+- A clean exit from HOME → Close, also mid-match. Settings, saves and the log go to `sdmc:/switch/ra2engine/save/`.
+
+Not tested on the Switch yet: LAN multiplayer.
+
 ## Build
 
 ```sh
@@ -61,8 +85,9 @@ The log warns when it runs in applet mode.
 | − | Mission objectives (campaign) / pause menu (skirmish) |
 | + | Options / save / load menu |
 | Touch screen (handheld) | The touch controls (tap, drag, CMD column); the controller's cursor hides them again |
+| Rumble | A short pulse when the base is under attack |
 
-The engine has no escort command (Ctrl+Alt) and no waypoint mode, so ZL + A is attack-move.
+The left stick moves the cursor and the right stick pans the map (swapped from the first builds). The engine has no escort command (Ctrl+Alt) and no waypoint mode, so ZL + A is attack-move.
 
 ## Text
 
@@ -71,7 +96,10 @@ Menu and HUD text is drawn in DejaVu Sans (`switch/romfs/fonts`, SDL2_ttf; `swit
 largest size its box allows. An empty file `sdmc:/switch/ra2engine/classic_font` keeps the original fonts (drawn
 with solid strokes and the HUD at a whole 2x scale).
 
-## Hardware status (2026-10-30, Atmosphère, hbmenu title takeover)
+## Hardware status
+
+Tested 2026-10-30 to 2026-11-01 on Atmosphère through hbmenu title takeover: the timings below ran docked, and
+handheld play (touch, controls, sound, text) was checked by hand.
 
 | | Stock Mesa 20.1 | Mesa 26.2.4 (NVK/zink SDK) |
 |---|---|---|

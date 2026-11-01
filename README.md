@@ -1,7 +1,7 @@
 # RA2 Engine
 
 An **unofficial, open-source engine for Command & Conquer: Red Alert 2 — Yuri's
-Revenge**, for **Windows and Android**. You play the original campaign,
+Revenge**, for **Windows, Android and Nintendo Switch** (homebrew). You play the original campaign,
 skirmish and multiplayer with the game files from **your own copy** of the
 game. No game data is included.
 
@@ -21,7 +21,8 @@ words.
 - **Red Alert 2 with Yuri's Revenge**, installed from a legally owned copy
   (CD, The First Decade, Origin / EA App or Steam). The engine reads the
   Yuri's Revenge data, so a Red Alert 2-only install is not enough.
-- **Windows 10 or later**, or **Android 5.0 or later**.
+- **Windows 10 or later**, **Android 5.0 or later**, or a **Nintendo Switch** that runs homebrew
+  (Atmosphère + hbmenu).
 
 ## Install
 
@@ -75,6 +76,14 @@ Game Files** in the game.
 
 The full player guide covers controls (mouse and touch), movies, network play,
 saves and troubleshooting: **[docs/INSTALL.md](docs/INSTALL.md)**.
+
+### 2c. Nintendo Switch
+
+Download the `ra2engine-switch-*.zip` from
+[Releases](https://github.com/Thorhax/ra2-engine-switch/releases), unzip it onto the root of the SD card, copy the
+game files from step 1 into `sdmc:/switch/ra2engine/`, then hold **R** while launching any game and pick
+**RA2 Engine** in the homebrew menu. Controls, touch, build instructions and status:
+[`switch/README.md`](switch/README.md).
 
 ## Multiplayer
 
