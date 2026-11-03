@@ -140,6 +140,10 @@ void SwitchGamepad::load_keymap(const char* path) {
             bind.kind = Binding::MouseLeft;
         } else if (uval == "MOUSE_RIGHT" || uval == "RIGHT_CLICK") {
             bind.kind = Binding::MouseRight;
+        } else if (uval == "SIDEBAR" || uval == "BUILD_LIST") {
+            bind.kind = Binding::Sidebar;
+        } else if (uval == "SIDEBAR_HOLD" || uval == "BUILD_LIST_HOLD") {
+            bind.kind = Binding::SidebarHold;
         } else {
             // "h", "ESC", "RIGHT CTRL", "CTRL+1": modifiers joined with '+' before the key.
             int mods = 0, k = 0;
@@ -201,6 +205,12 @@ bool SwitchGamepad::custom_button(int b, bool down, uint32_t t) {
             emit_pointer(down ? InputEvent::PointerDown : InputEvent::PointerUp, pb, t);
             return true;
         }
+        case Binding::Sidebar:   // tap: battlefield <-> build strip, like R
+            if (down) jump_sidebar(!in_sidebar(), t);
+            return true;
+        case Binding::SidebarHold:   // held: the build strip; released: back to the battlefield
+            jump_sidebar(down, t);
+            return true;
         case Binding::Key: {
             if (!down) return true;
             InputEvent e;
@@ -248,6 +258,18 @@ void SwitchGamepad::open_all() {
 }
 
 bool SwitchGamepad::in_sidebar() const { return cx_ >= w_ - kSidebarW; }
+
+void SwitchGamepad::jump_sidebar(bool to_strip, uint32_t t) {
+    if (to_strip == in_sidebar()) return;
+    if (!to_strip) {
+        move_cursor(map_x_, map_y_, t);
+        return;
+    }
+    map_x_ = cx_;
+    map_y_ = cy_;
+    move_cursor(static_cast<float>(w_ - kSidebarW + kCameoX + kCameoW / 2),
+                static_cast<float>(kStripTop + 1 + kCameoH / 2), t);
+}
 
 void SwitchGamepad::emit_pointer(InputEvent::Kind k, InputEvent::Button b, uint32_t t, int x, int y) {
     InputEvent e;
@@ -372,16 +394,7 @@ void SwitchGamepad::button(int b, bool down, uint32_t t) {
                 r_used_ = false;
             } else if (r_) {
                 r_ = false;
-                if (!r_used_) {   // tap: jump between the battlefield and the build strip
-                    if (in_sidebar()) {
-                        move_cursor(map_x_, map_y_, t);
-                    } else {
-                        map_x_ = cx_;
-                        map_y_ = cy_;
-                        move_cursor(static_cast<float>(w_ - kSidebarW + kCameoX + kCameoW / 2),
-                                    static_cast<float>(kStripTop + 1 + kCameoH / 2), t);
-                    }
-                }
+                if (!r_used_) jump_sidebar(!in_sidebar(), t);   // tap: battlefield <-> build strip
             }
             break;
         case kBtnZR:

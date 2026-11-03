@@ -161,6 +161,10 @@
 
     // Returns true when the key was a bound command (consumed).
     bool hotkey(const ra2engine::InputEvent& ev) {
+        if (ev.kind == ra2engine::InputEvent::Key && ev.key == ra2engine::kKeySelectAll) {
+            hotkey_combatant_select();   // Switch: a three-finger tap
+            return true;
+        }
         if (ev.kind != ra2engine::InputEvent::Key || ev.vk == 0) return false;
         if (hotkeys_ver_ != g_hotkeys_version) {   // W5-E: the Keyboard page saved a remap
             hotkeys_ = load_hotkeys();

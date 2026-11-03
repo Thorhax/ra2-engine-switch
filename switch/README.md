@@ -87,6 +87,7 @@ The log warns when it runs in applet mode.
 | − | Mission objectives (campaign) / pause menu (skirmish) |
 | + | Options / save / load menu |
 | Touch screen (handheld) | The touch controls (tap, drag, CMD column); the controller's cursor hides them again |
+| Three-finger tap | Select every combat unit (P) |
 | Rumble | A short pulse when the base is under attack |
 
 The left stick moves the cursor and the right stick pans the map (swapped from the first builds). The engine has no escort command (Ctrl+Alt) and no waypoint mode, so ZL + A is attack-move.
@@ -110,7 +111,9 @@ PLUS=ESC
 
 Buttons: `A B X Y L R ZL ZR PLUS MINUS LSTICK RSTICK DUP DDOWN DLEFT DRIGHT`. A value is `MOUSE_LEFT`,
 `MOUSE_RIGHT`, a key (`h`, `2`, `ESC`, `ENTER`, `SPACE`, `HOME`, `F1`...), a combo (`CTRL+1`, `ALT+1`), a held
-modifier (`CTRL`, `SHIFT`, `ALT`, `RIGHT CTRL`...), `NONE` or `DEFAULT`. Buttons left out keep the built-in action.
+modifier (`CTRL`, `SHIFT`, `ALT`, `RIGHT CTRL`...), `SIDEBAR` (tap: cursor to the build list and back, like R),
+`SIDEBAR_HOLD` (held: the cursor sits on the build list; released: back on the map), `NONE` or `DEFAULT`. Buttons
+left out keep the built-in action.
 Keys act like the same key on a keyboard, so they follow the keyboard hotkeys below. The log names the file and
 any line it skipped (`[keymap]`).
 

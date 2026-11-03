@@ -19,7 +19,8 @@
 //   two-finger drag             -> Pan
 //   two-finger tap              -> right click (cancel a mode, else deselect)
 //   three-finger tap            -> Key kKeyPerfToggle (R-170: the FPS / perf
-//                                  overlay; the scene driver eats it)
+//                                  overlay; the scene driver eats it). On the
+//                                  Switch it is kKeySelectAll (CombatantSelect).
 //   W6-01-11: while BOX mode is on (the sticky [BOX] button of the command
 //   column, set_box_mode), a one-finger drag draws the band box at once (no
 //   hold); two fingers still scroll.
@@ -41,12 +42,14 @@ public:
         uint32_t two_finger_tap_ms = 300;
         uint32_t feedback_delay_ms = 150;   // the hold ring appears after this
         uint32_t three_finger_tap_ms = 500;
+        int three_finger_key = kKeyPerfToggle;   // Switch: kKeySelectAll
     };
     TouchGestures() = default;
     explicit TouchGestures(Config c) : cfg_(c) {}
     // W9-04-06: the Platform scales the slop to 8 dp on a phone.
     void set_slop(int px) { if (px > 0) cfg_.slop_px = px; }
     int slop() const { return cfg_.slop_px; }
+    void set_three_finger_key(int key) { cfg_.three_finger_key = key; }
 
     void finger_down(int64_t id, int x, int y, uint32_t t_ms);
     void finger_move(int64_t id, int x, int y, uint32_t t_ms);

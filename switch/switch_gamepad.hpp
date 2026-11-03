@@ -38,7 +38,7 @@ public:
 private:
     // keymap.keys: one binding per button (Default = the built-in action).
     struct Binding {
-        enum Kind { Default, None, MouseLeft, MouseRight, Key, Modifier } kind = Default;
+        enum Kind { Default, None, MouseLeft, MouseRight, Key, Modifier, Sidebar, SidebarHold } kind = Default;
         int sdl_key = 0;   // Key
         int mods = 0;      // Key: the combo's KMOD bits; Modifier: the KMOD bits held
     };
@@ -56,6 +56,8 @@ private:
     void emit_vk(int vk, uint32_t t, bool ctrl = false, int key = 0);
     void move_cursor(float x, float y, uint32_t t);
     bool in_sidebar() const;
+    // R's tap: the cursor to the build strip (remembering its battlefield spot) or back.
+    void jump_sidebar(bool to_strip, uint32_t t);
 
     int w_ = 1280, h_ = 720;
     float cx_ = 640.0f, cy_ = 360.0f;          // cursor, logical pixels

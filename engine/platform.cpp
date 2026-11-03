@@ -114,6 +114,7 @@ Platform Platform::create(const char* title, int w, int h, bool hidden) {
     p.p_->update_slop();
 #ifdef __SWITCH__
     p.p_->pad.init(w, h);
+    p.p_->touch.set_three_finger_key(kKeySelectAll);   // three-finger tap = select every combat unit
 #endif
     return p;
 }

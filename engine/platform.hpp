@@ -37,7 +37,8 @@ struct InputEvent {
 };
 enum : int { kKeyBackspace = 1, kKeyEnter = 2, kKeyUp = 3, kKeyDown = 4, kKeyDelete = 5,
              kKeyF10 = 6, kKeyF1 = 7 /* P10 briefing */, kKeyEscape = 8 /* G-01 */,
-             kKeyPerfToggle = 9 /* R-170: three-finger tap / Ctrl+Shift+F, eaten by the driver */ };
+             kKeyPerfToggle = 9 /* R-170: three-finger tap / Ctrl+Shift+F, eaten by the driver */,
+             kKeySelectAll = 10 /* Switch: three-finger tap = CombatantSelect */ };
 
 // G0: anything that yields InputEvents -- the real Platform, or the --play
 // harness's scripted source. poll() returns false when no event is pending.

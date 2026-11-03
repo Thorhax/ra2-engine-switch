@@ -9,7 +9,13 @@
 #   a combo: CTRL+1 (make team 1), SHIFT+1, ALT+1 (center on team 1)
 #   CTRL, SHIFT, ALT (or LEFT CTRL, RIGHT CTRL ...): held, it adds that modifier to
 #     the other buttons (L=CTRL then Y=1 gives Ctrl+1)
+#   SIDEBAR: tap to jump the cursor to the build list and back (like R)
+#   SIDEBAR_HOLD: hold to put the cursor on the build list, release to go back to the map
 #   NONE: the button does nothing; DEFAULT: the built-in action
+#
+# Handy keys (the PC hotkeys, changeable in Options > Keyboard): h base, p select all
+# combat units, t select all of a type, d deploy, s stop, g guard, x scatter,
+# k repair, l sell, q w e r sidebar tabs, 1-0 teams, SPACE last radar event
 #
 # RSTICK_MOUSE=TRUE   the right stick moves the cursor, the left stick scrolls the map
 # DPAD_ARROWS=TRUE    the D-pad scrolls the map (R + D-pad still picks teams)

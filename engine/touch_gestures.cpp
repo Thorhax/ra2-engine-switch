@@ -184,7 +184,7 @@ void TouchGestures::finger_up(int64_t id, int x, int y, uint32_t t) {
                 if (travel_ <= cfg_.slop_px * 2 && t - t2_ <= cfg_.three_finger_tap_ms) {
                     InputEvent e;
                     e.kind = InputEvent::Key;
-                    e.key = kKeyPerfToggle;
+                    e.key = cfg_.three_finger_key;
                     e.t_ms = t;
                     e.touch = true;
                     out_.push_back(e);
