@@ -70,6 +70,15 @@ public:
     static void set_box_mode(bool on) { box_mode_ = on; }
     static bool box_mode() { return box_mode_; }
 
+    // Diagnostics (the Switch logs every finger lift): the gesture state and where / when it began.
+    const char* state_name() const {
+        static const char* const kNames[] = {"idle", "tap", "pan", "hold", "box", "waitup", "two-finger"};
+        return kNames[static_cast<int>(st_)];
+    }
+    int start_x() const { return x0_; }
+    int start_y() const { return y0_; }
+    uint32_t start_t() const { return t0_; }
+
     bool pending() const { return !out_.empty(); }
     bool pop(InputEvent& ev) {
         if (out_.empty()) return false;

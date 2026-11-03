@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 
 #include "cargo.hpp"   // can_load (W7-01-30)
@@ -349,6 +350,16 @@ Input::Action Input::classify(int px, int py, bool shift, bool ctrl, bool alt) c
 
 void Input::left_click_original(int px, int py, bool shift, uint32_t t_ms) {
     const Action a = classify(px, py, shift, mod_ctrl_, mod_alt_);
+#ifdef __SWITCH__
+    if (ev_touch_) {   // touch diagnostics for tester logs (Action numbers: input.hpp)
+        const int ui = unit_under(px, py);
+        const int bi = pick_building(px, py, true);
+        std::fprintf(stderr, "[touch] click %d,%d action=%d selected=%d unit=%d house=%d building=%d house=%d me=%d\n",
+                     px, py, static_cast<int>(a), static_cast<int>(sel_.ids().size()), ui,
+                     ui >= 0 ? world_.units()[ui].house : -1, bi, bi >= 0 ? world_.buildings()[bi].house : -1,
+                     world_.order_issuer());
+    }
+#endif
     const int slop = ev_touch_ ? kDblSlopTouch : kDblSlopO;
     const bool is_double = last_click_t_ != 0 &&
                            (t_ms - last_click_t_) <= (ev_touch_ ? kDblMsTouch : kDblMsO) &&
@@ -591,12 +602,18 @@ void Input::handle_original(const InputEvent& ev) {
                         actions_.sell_building = bi;
                     }
                 }
-            } else if (dragging_ && ev.touch && !box_has_own_unit() &&
-                       std::abs(ev.x - down_x_) <= kTouchTapBox && std::abs(ev.y - down_y_) <= kTouchTapBox) {
-                // A tiny touch box with no own unit in it is a fingertip that rolled during a
-                // tap (BOX mode): the tap, at the point it began -- an enemy tapped is attacked.
+            } else if (dragging_ && ev.touch && std::abs(ev.x - down_x_) <= kTouchTapBox &&
+                       std::abs(ev.y - down_y_) <= kTouchTapBox &&
+                       (!box_has_own_unit() || action_at(down_x_, down_y_) == Action::Attack)) {
+                // A tiny touch box with no own unit in it (or begun on an enemy) is a fingertip that
+                // rolled during a tap (BOX mode): the tap, at the point it began -- an enemy tapped is attacked.
                 left_click_original(down_x_, down_y_, down_shift_, ev.t_ms);
             } else if (dragging_) {
+#ifdef __SWITCH__
+                if (ev.touch)
+                    std::fprintf(stderr, "[touch] box %d,%d-%d,%d own=%d\n", down_x_, down_y_, ev.x, ev.y,
+                                 box_has_own_unit() ? 1 : 0);
+#endif
                 // W4-AM-01: an empty touch band box keeps the selection.
                 if (!ev.touch || box_has_own_unit()) commit_box(down_shift_);
                 if (any_own_selected()) selected_building_ = -1;

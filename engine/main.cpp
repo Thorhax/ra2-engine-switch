@@ -6986,6 +6986,12 @@ public:
         track_pointer(ev);           // G0/G-71: pointer position from events, not SDL state
         if (ev.touch) touch_ui_ = true;   // W4-AM: the touch column / banner appear (also while locked)
 #ifdef __SWITCH__
+        if (ev.touch && ev.kind == ra2engine::InputEvent::PointerUp)   // touch diagnostics for tester logs
+            std::fprintf(stderr, "[touch] %s up %d,%d: menu=%d locked=%d sidebar=%d column=%d mode=%d box=%d\n",
+                         ev.button == ra2engine::InputEvent::Right ? "right" : "left", ev.x, ev.y,
+                         menu_.open_ || sld_.is_open() ? 1 : 0, input_locked_ ? 1 : 0,
+                         sidebar_up_ && lay_.contains(ev.x, ev.y) ? 1 : 0, touch_btn_at(ev.x, ev.y) >= 0 ? 1 : 0,
+                         touch_mode(), touch_box_ ? 1 : 0);
         // Handheld touch and the controller take turns: the controller's
         // pointer (no finger) puts the touch column / hints away again.
         else if (ev.kind == ra2engine::InputEvent::PointerMove || ev.kind == ra2engine::InputEvent::PointerDown) {

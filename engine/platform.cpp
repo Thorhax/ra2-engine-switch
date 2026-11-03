@@ -430,6 +430,13 @@ bool Platform::poll(InputEvent& ev) {
             ev.kind = InputEvent::None;
             break;
         case SDL_FINGERUP:
+#ifdef __SWITCH__
+            // Touch diagnostics for tester logs: what the lift ends (tap / box / pan / hold) and how far
+            // and how long the finger moved.
+            std::fprintf(stderr, "[touch] lift %d,%d: %s from %d,%d, %u ms\n", static_cast<int>(e.tfinger.x * p_->w),
+                         static_cast<int>(e.tfinger.y * p_->h), p_->touch.state_name(), p_->touch.start_x(),
+                         p_->touch.start_y(), static_cast<unsigned>(e.tfinger.timestamp - p_->touch.start_t()));
+#endif
             if (e.tfinger.pressure < 0.0f)   // W2-AR-18: SDLSurface marks ACTION_CANCEL
                 p_->touch.finger_cancel(e.tfinger.fingerId, static_cast<int>(e.tfinger.x * p_->w),
                                         static_cast<int>(e.tfinger.y * p_->h), e.tfinger.timestamp);
