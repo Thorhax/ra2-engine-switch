@@ -1,7 +1,8 @@
 #pragma once
 // Nintendo Switch controller -> InputEvents: a stick-driven virtual mouse plus
 // KeyboardMD.ini hotkeys, drained by Platform::poll like the touch gestures.
-// The button map is in switch/README.md ("Controls").
+// The button map is in switch/README.md ("Controls"); sdmc:/switch/ra2engine/keymap.keys
+// can rebind buttons to keys / mouse buttons and move the cursor to the right stick.
 //
 // Buttons use switch-sdl2's joystick indices (libnx HidNpadButton bit order),
 // so the labels are the ones printed on the Joy-Con / Pro Controller.
@@ -25,11 +26,27 @@ public:
     bool pop(InputEvent& ev);
     // A finger took over: park the virtual cursor there and hide it.
     void on_touch(int x, int y);
+    // A USB mouse moved: it drives the same cursor (shown) as the left stick.
+    void on_mouse_move(int dx, int dy);
+    // The cursor position for a mouse event.
+    void mouse_pos(int& x, int& y) const { x = static_cast<int>(cx_); y = static_cast<int>(cy_); }
     // Arrow cursor for screens that expect the (absent) OS pointer.
     void draw_cursor(SDL_Renderer* ren) const;
     bool cursor_visible() const { return visible_; }
+    bool debug() const { return debug_; }
 
 private:
+    // keymap.keys: one binding per button (Default = the built-in action).
+    struct Binding {
+        enum Kind { Default, None, MouseLeft, MouseRight, Key, Modifier } kind = Default;
+        int sdl_key = 0;   // Key
+        int mods = 0;      // Key: the combo's KMOD bits; Modifier: the KMOD bits held
+    };
+    static constexpr int kButtons = 16;
+    void load_keymap(const char* path);
+    bool custom_button(int b, bool down, uint32_t t);   // true = a keymap binding handled it
+    int held_mods() const;
+
     void open_all();
     void button(int b, bool down, uint32_t t);
     void emit_pointer(InputEvent::Kind k, InputEvent::Button b, uint32_t t, int x, int y);
@@ -59,6 +76,10 @@ private:
     int y_x_ = 0, y_y_ = 0;
     uint32_t l3_last_ = 0;                // L3 twice: CenterBase
     int tab_ = 0;                         // D-pad left/right: production tab
+    Binding map_[kButtons];
+    bool down_[kButtons] = {};
+    bool cursor_right_ = false;   // keymap RSTICK_MOUSE: the right stick moves the cursor
+    bool dpad_pan_ = false;       // keymap DPAD_ARROWS: the D-pad scrolls the map
     std::deque<InputEvent> out_;
 };
 

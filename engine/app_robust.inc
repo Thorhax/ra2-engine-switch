@@ -45,6 +45,9 @@ void game_logical_size(int& out_w, int& out_h) {
         lh = std::max(520, std::min(720, lh)) & ~1;
     }
 #endif
+#ifdef __SWITCH__
+    lh = ra2_switch_game_height();   // switch.ini UIScale: a lower canvas = a bigger sidebar / cameos
+#endif
     const int lw = static_cast<int>(std::lround(static_cast<double>(lh) * w / h)) & ~1;
     out_h = lh;
     out_w = std::max(lh * 16 / 9, std::min(lh * 239 / 100, lw));

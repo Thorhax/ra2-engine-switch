@@ -7002,6 +7002,10 @@ public:
         // every pointer / key / touch event past the options menu is dropped.
         if (input_locked_) return;
         if (hotkey(ev)) return;      // G-04: KeyboardMD.ini [Hotkey] commands
+        if (ev.kind == ra2engine::InputEvent::Wheel) {   // the wheel over the sidebar scrolls the strip
+            if (sidebar_up_ && lay_.contains(mx_, my_)) strip_scroll(-ev.y);
+            return;
+        }
         if (touch_bar_handle(ev)) return;   // W2-AR-08 touch command bar (touch_bar.inc)
         if (touch_ui_handle(ev)) return;    // W4-AM touch router (touch_ui.inc)
         if (sidebar_up_ && ev.kind == ra2engine::InputEvent::PointerDown &&

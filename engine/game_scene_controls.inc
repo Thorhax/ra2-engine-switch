@@ -166,8 +166,10 @@
             hotkeys_ = load_hotkeys();
             hotkeys_ver_ = g_hotkeys_version;
         }
-        const ra2engine::HotBinding b = hotkeys_.lookup(ev.vk, ev.shift, ev.ctrl, ev.alt);
+        ra2engine::HotBinding b = hotkeys_.lookup(ev.vk, ev.shift, ev.ctrl, ev.alt);
         using C = ra2engine::HotCmd;
+        // Home (VK 36) goes to the base like H (CenterBase) while nothing else is bound to it.
+        if (b.cmd == C::None && ev.vk == 36 && !ev.shift && !ev.ctrl && !ev.alt) b.cmd = C::CenterBase;
         switch (b.cmd) {
             case C::None: return false;
             case C::Options: menu_.open(); return true;

@@ -1,0 +1,27 @@
+# RA2 Engine for Switch: controller remapping.
+# Rename this file to keymap.keys (in sdmc:/switch/ra2engine/) and restart the game.
+# Buttons you leave out keep their built-in action (see README "Controls").
+#
+# Buttons: A B X Y L R ZL ZR PLUS MINUS LSTICK RSTICK DUP DDOWN DLEFT DRIGHT
+# Values:
+#   MOUSE_LEFT / MOUSE_RIGHT      a mouse click at the cursor (hold + move = drag)
+#   a key: h, 2, ESC, ENTER, SPACE, HOME, DELETE, F1 ... F12, UP, DOWN, ...
+#   a combo: CTRL+1 (make team 1), SHIFT+1, ALT+1 (center on team 1)
+#   CTRL, SHIFT, ALT (or LEFT CTRL, RIGHT CTRL ...): held, it adds that modifier to
+#     the other buttons (L=CTRL then Y=1 gives Ctrl+1)
+#   NONE: the button does nothing; DEFAULT: the built-in action
+#
+# RSTICK_MOUSE=TRUE   the right stick moves the cursor, the left stick scrolls the map
+# DPAD_ARROWS=TRUE    the D-pad scrolls the map (R + D-pad still picks teams)
+
+RSTICK_MOUSE=TRUE
+DPAD_ARROWS=TRUE
+ZR=MOUSE_LEFT
+ZL=MOUSE_RIGHT
+L=CTRL
+Y=1
+B=2
+X=3
+R=h
+A=d
+PLUS=ESC

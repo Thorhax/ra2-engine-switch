@@ -5,7 +5,10 @@
 #include <arpa/inet.h>   // struct in_addr for __nxlink_host
 #include <switch.h>
 
+#include <algorithm>
 #include <atomic>
+#include <cmath>
+#include <strings.h>
 #include <malloc.h>
 #include <cstdio>
 #include <cstdlib>
@@ -34,6 +37,73 @@ void ra2_switch_rumble(float strength, int ms) {
     for (int i = 0; i < SDL_NumJoysticks(); ++i)
         if (SDL_Joystick* j = SDL_JoystickFromInstanceID(SDL_JoystickGetDeviceInstanceID(i)))
             SDL_JoystickRumble(j, v, v, static_cast<Uint32>(ms));
+}
+
+int ra2_switch_kbd_mods() {
+    // switch-sdl2 sends a keyboard's Ctrl / Shift / Alt only as key bits; the HID state's modifier
+    // field is the reliable one (a USB keyboard can report a held modifier there alone).
+    HidKeyboardState st;
+    if (hidGetKeyboardStates(&st, 1) == 0) return 0;
+    int m = 0;
+    if (st.modifiers & HidKeyboardModifier_Control) m |= KMOD_LCTRL;
+    if (st.modifiers & HidKeyboardModifier_Shift) m |= KMOD_LSHIFT;
+    if (st.modifiers & HidKeyboardModifier_LeftAlt) m |= KMOD_LALT;
+    if (st.modifiers & HidKeyboardModifier_RightAlt) m |= KMOD_RALT;
+    return m;
+}
+
+int ra2_switch_mouse_wheel() {
+    // switch-sdl2 has no wheel events: sum the samples' wheel deltas since the last call.
+    static u64 last = 0;
+    static int acc = 0;
+    HidMouseState st[16];
+    const size_t n = hidGetMouseStates(st, 16);   // newest first
+    u64 newest = last;
+    for (size_t i = 0; i < n; ++i) {
+        if (st[i].sampling_number <= last) break;
+        if (last != 0) acc += st[i].wheel_delta_y;   // the first call only sets the baseline
+        if (st[i].sampling_number > newest) newest = st[i].sampling_number;
+    }
+    last = newest;
+    // A notch is 120 on wheels that report WHEEL_DELTA units, 1 on the rest.
+    const int unit = (acc >= 120 || acc <= -120) ? 120 : 1;
+    const int notches = acc / unit;
+    acc -= notches * unit;
+    return notches;
+}
+
+namespace {
+// switch.ini: "UIScale=1.25" style lines (any section); read once.
+struct UiScales { bool read = false; double all = 0, handheld = 0, docked = 0; };
+UiScales g_ui;
+void read_switch_ini() {
+    if (g_ui.read) return;
+    g_ui.read = true;
+    FILE* f = std::fopen(RA2_SWITCH_BASE_DIR "switch.ini", "r");
+    if (!f) return;
+    char line[256];
+    while (std::fgets(line, sizeof line, f)) {
+        char key[64];
+        double v = 0;
+        if (std::sscanf(line, " %63[A-Za-z] = %lf", key, &v) != 2) continue;
+        if (!strcasecmp(key, "UIScale")) g_ui.all = v;
+        else if (!strcasecmp(key, "UIScaleHandheld")) g_ui.handheld = v;
+        else if (!strcasecmp(key, "UIScaleDocked")) g_ui.docked = v;
+    }
+    std::fclose(f);
+    std::fprintf(stderr, "[switch] switch.ini UIScale=%g handheld=%g docked=%g\n", g_ui.all, g_ui.handheld,
+                 g_ui.docked);
+}
+}  // namespace
+
+int ra2_switch_game_height() {
+    read_switch_ini();
+    const bool docked = appletGetOperationMode() == AppletOperationMode_Console;
+    double s = docked ? g_ui.docked : g_ui.handheld;
+    if (s <= 0) s = g_ui.all;
+    if (s <= 0) s = 1.0;
+    s = std::max(1.0, std::min(1.5, s));
+    return static_cast<int>(std::lround(720.0 / s)) & ~1;
 }
 
 void ra2_switch_pin_thread(int core) {

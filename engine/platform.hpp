@@ -12,7 +12,8 @@ struct InputEvent {
     // AppLowMemory (drop caches), RenderReset (GL context lost: textures gone).
     enum Kind { None, Quit, PointerDown, PointerUp, PointerMove, Key, Text, Pan,
                 AppBackground, AppForeground, AppLowMemory, RenderReset,
-                Resize /* R-162: the window / panel changed size */ } kind = None;
+                Resize /* R-162: the window / panel changed size */,
+                Wheel /* mouse wheel: y = notches, + = away from the user */ } kind = None;
     int x = 0, y = 0;                       // pointer position (window pixels)
     enum Button { Left, Right } button = Left;  // valid on PointerDown/PointerUp
     bool shift = false;                     // Shift held at event time

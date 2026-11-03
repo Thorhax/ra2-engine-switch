@@ -3,6 +3,7 @@
 #include "touch_gestures.hpp"
 #ifdef __SWITCH__
 #include "switch_gamepad.hpp"   // switch/: stick cursor + hotkeys
+#include "switch_platform.hpp"  // USB keyboard modifiers, mouse wheel
 #endif
 
 #include <SDL.h>
@@ -228,6 +229,15 @@ static int vk_from_sdl(int k) {
     }
 }
 
+// Ctrl / Shift / Alt held now. On Switch the HID modifier field is added (switch-sdl2 only tracks
+// the modifier keys' own key bits).
+static int mod_state(int sdl_mod) {
+#ifdef __SWITCH__
+    sdl_mod |= ra2_switch_kbd_mods();
+#endif
+    return sdl_mod;
+}
+
 void key_event_from_sdl(int k, int mod, InputEvent& ev) {
     ev.shift = (mod & KMOD_SHIFT) != 0;
     ev.ctrl = (mod & KMOD_CTRL) != 0;
@@ -270,6 +280,11 @@ bool Platform::poll(InputEvent& ev) {
 #ifdef __SWITCH__
         p_->pad.tick(SDL_GetTicks());     // stick cursor / map scroll
         if (p_->pad.pop(ev)) return true;
+        if (const int notches = ra2_switch_mouse_wheel()) {
+            ev.kind = InputEvent::Wheel;
+            ev.y = notches;
+            return true;
+        }
 #endif
         ev.kind = InputEvent::None;
         return false;
@@ -293,7 +308,12 @@ bool Platform::poll(InputEvent& ev) {
                 ev.kind = InputEvent::None;
                 break;
             }
-            key_event_from_sdl(e.key.keysym.sym, e.key.keysym.mod, ev);
+            key_event_from_sdl(e.key.keysym.sym, mod_state(e.key.keysym.mod), ev);
+#ifdef __SWITCH__
+            if (p_->pad.debug())
+                std::fprintf(stderr, "[kbd] sym=%d sdl_mod=0x%x mod=0x%x vk=%d\n", e.key.keysym.sym,
+                             e.key.keysym.mod, mod_state(e.key.keysym.mod), ev.vk);
+#endif
             ev.t_ms = e.key.timestamp;
             // A held command key must not re-fire (D would toggle deployers
             // every repeat); only the editing keys (kKey*) auto-repeat.
@@ -338,29 +358,37 @@ bool Platform::poll(InputEvent& ev) {
             break;
         case SDL_MOUSEBUTTONDOWN:
             if (e.button.which == SDL_TOUCH_MOUSEID) break;   // G-71: no synthetic duplicate
+            if (e.button.button == SDL_BUTTON_MIDDLE) { ev.kind = InputEvent::None; break; }
             if (p_->drop_mouse(e.button.x, e.button.y, false)) break;   // W9-04-04
             p_->last_touch = false;
             ev.kind = InputEvent::PointerDown;
             ev.x = e.button.x;
             ev.y = e.button.y;
+#ifdef __SWITCH__
+            p_->pad.mouse_pos(ev.x, ev.y);   // the mouse shares the drawn cursor
+#endif
             ev.button = (e.button.button == SDL_BUTTON_RIGHT) ? InputEvent::Right
                                                               : InputEvent::Left;
-            ev.shift = (SDL_GetModState() & KMOD_SHIFT) != 0;
-            ev.ctrl = (SDL_GetModState() & KMOD_CTRL) != 0;
-            ev.alt = (SDL_GetModState() & KMOD_ALT) != 0;
+            ev.shift = (mod_state(SDL_GetModState()) & KMOD_SHIFT) != 0;
+            ev.ctrl = (mod_state(SDL_GetModState()) & KMOD_CTRL) != 0;
+            ev.alt = (mod_state(SDL_GetModState()) & KMOD_ALT) != 0;
             ev.t_ms = e.button.timestamp;
             break;
         case SDL_MOUSEBUTTONUP:
             if (e.button.which == SDL_TOUCH_MOUSEID) break;
+            if (e.button.button == SDL_BUTTON_MIDDLE) { ev.kind = InputEvent::None; break; }
             if (p_->drop_mouse(e.button.x, e.button.y, false)) break;   // W9-04-04
             ev.kind = InputEvent::PointerUp;
             ev.x = e.button.x;
             ev.y = e.button.y;
+#ifdef __SWITCH__
+            p_->pad.mouse_pos(ev.x, ev.y);   // the mouse shares the drawn cursor
+#endif
             ev.button = (e.button.button == SDL_BUTTON_RIGHT) ? InputEvent::Right
                                                               : InputEvent::Left;
-            ev.shift = (SDL_GetModState() & KMOD_SHIFT) != 0;
-            ev.ctrl = (SDL_GetModState() & KMOD_CTRL) != 0;
-            ev.alt = (SDL_GetModState() & KMOD_ALT) != 0;
+            ev.shift = (mod_state(SDL_GetModState()) & KMOD_SHIFT) != 0;
+            ev.ctrl = (mod_state(SDL_GetModState()) & KMOD_CTRL) != 0;
+            ev.alt = (mod_state(SDL_GetModState()) & KMOD_ALT) != 0;
             ev.t_ms = e.button.timestamp;
             break;
         case SDL_MOUSEMOTION:
@@ -370,10 +398,22 @@ bool Platform::poll(InputEvent& ev) {
             ev.kind = InputEvent::PointerMove;
             ev.x = e.motion.x;
             ev.y = e.motion.y;
+#ifdef __SWITCH__
+            // No OS pointer: the mouse moves the drawn cursor (relative motion, so the stick and
+            // the mouse pick up where the other left it).
+            p_->pad.on_mouse_move(e.motion.xrel, e.motion.yrel);
+            p_->pad.mouse_pos(ev.x, ev.y);
+#endif
             ev.t_ms = e.motion.timestamp;
-            ev.shift = (SDL_GetModState() & KMOD_SHIFT) != 0;
-            ev.ctrl = (SDL_GetModState() & KMOD_CTRL) != 0;
-            ev.alt = (SDL_GetModState() & KMOD_ALT) != 0;
+            ev.shift = (mod_state(SDL_GetModState()) & KMOD_SHIFT) != 0;
+            ev.ctrl = (mod_state(SDL_GetModState()) & KMOD_CTRL) != 0;
+            ev.alt = (mod_state(SDL_GetModState()) & KMOD_ALT) != 0;
+            break;
+        case SDL_MOUSEWHEEL:
+            if (e.wheel.which == SDL_TOUCH_MOUSEID || e.wheel.y == 0) break;
+            ev.kind = InputEvent::Wheel;
+            ev.y = e.wheel.direction == SDL_MOUSEWHEEL_FLIPPED ? -e.wheel.y : e.wheel.y;
+            ev.t_ms = e.wheel.timestamp;
             break;
         // G-70: fingers go through the gesture layer (tap = left click, drag =
         // band box, long-press / two-finger tap = right click, two-finger drag =

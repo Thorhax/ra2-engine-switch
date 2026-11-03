@@ -17,6 +17,7 @@ trap 'rm -rf "$stage"' EXIT
 mkdir -p "$stage/switch/ra2engine"
 cp "$nro" "$stage/switch/ra2engine/ra2engine.nro"
 cp "$root/LICENSE" "$stage/switch/ra2engine/LICENSE"
+cp "$root/switch/keymap.keys.example" "$root/switch/switch.ini.example" "$stage/switch/ra2engine/"
 cat > "$stage/switch/ra2engine/INSTALL.txt" <<EOF
 RA2 Engine for Nintendo Switch ($version${suffix:+, Mesa 26 build})
 
@@ -27,6 +28,10 @@ RA2 Engine for Nintendo Switch ($version${suffix:+, Mesa 26 build})
    The movies (movies01.mix, movies02.mix, movmd03.mix) are optional.
 3. Start it through title takeover: hold R while launching any game, then pick
    RA2 Engine in the homebrew menu. From the album it only gets a few hundred MB.
+
+Optional: keymap.keys.example (controller remapping) and switch.ini.example
+(bigger sidebar / UI) explain themselves; rename them without ".example" to use them.
+Keyboard hotkeys: in game, Options > Game Controls > Keyboard.
 
 Settings and saves go to sdmc:/switch/ra2engine/save/ (RA2.INI, Saved Games/),
 and the log to save/ra2engine.log. Controls: see switch/README.md in the source.

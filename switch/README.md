@@ -24,6 +24,8 @@ Yuri's Revenge game files.
 - Touch in handheld mode: the engine's touch controls (tap, drag-select, the CMD column) appear on the first touch
   and hide again when the controller's cursor moves.
 - Readable menu and HUD text in DejaVu Sans ([Text](#text)).
+- Controller remapping and a right-stick cursor ([`keymap.keys`](#remapping-keymapkeys)), a USB keyboard and
+  mouse ([Keyboard and mouse](#keyboard-and-mouse)), and a bigger sidebar / UI ([`switch.ini`](#bigger-sidebar-switchini)).
 - A clean exit from HOME → Close, also mid-match. Settings, saves and the log go to `sdmc:/switch/ra2engine/save/`.
 
 Not tested on the Switch yet: LAN multiplayer.
@@ -88,6 +90,54 @@ The log warns when it runs in applet mode.
 | Rumble | A short pulse when the base is under attack |
 
 The left stick moves the cursor and the right stick pans the map (swapped from the first builds). The engine has no escort command (Ctrl+Alt) and no waypoint mode, so ZL + A is attack-move.
+
+## Remapping (`keymap.keys`)
+
+`sdmc:/switch/ra2engine/keymap.keys` rebinds controller buttons to keys or mouse buttons
+(`switch/keymap.keys.example`, also in the release zip, explains every option):
+
+```
+RSTICK_MOUSE=TRUE   # right stick = cursor, left stick = map scroll
+DPAD_ARROWS=TRUE    # D-pad scrolls the map
+ZR=MOUSE_LEFT
+ZL=MOUSE_RIGHT
+L=CTRL              # held: Ctrl for the other buttons (L + Y = Ctrl+1, make team 1)
+Y=1
+R=h                 # H: center on the base
+B=CTRL+2            # combos work too
+PLUS=ESC
+```
+
+Buttons: `A B X Y L R ZL ZR PLUS MINUS LSTICK RSTICK DUP DDOWN DLEFT DRIGHT`. A value is `MOUSE_LEFT`,
+`MOUSE_RIGHT`, a key (`h`, `2`, `ESC`, `ENTER`, `SPACE`, `HOME`, `F1`...), a combo (`CTRL+1`, `ALT+1`), a held
+modifier (`CTRL`, `SHIFT`, `ALT`, `RIGHT CTRL`...), `NONE` or `DEFAULT`. Buttons left out keep the built-in action.
+Keys act like the same key on a keyboard, so they follow the keyboard hotkeys below. The log names the file and
+any line it skipped (`[keymap]`).
+
+## Keyboard and mouse
+
+A USB keyboard and mouse (in the dock, or an adapter in handheld) work like on PC. All of RA2's keyboard
+hotkeys are there (team select / create / add / center with Shift, Ctrl and Alt, H = base, D = deploy, S = stop,
+G = guard, X = scatter, Q W E R = tabs, ...); rebind them in game under Options → Game Controls → Keyboard, which
+saves `save/Keyboard.ini`. Home also goes to the base while nothing else is bound to it. The mouse moves the same
+cursor as the stick; the wheel over the sidebar scrolls the build list.
+
+switch-sdl2 only reports a keyboard's Ctrl / Shift / Alt as key presses and orders a press's keys by scancode,
+so Ctrl+1 arrived as a plain 1; the engine reads the HID modifier state instead. It has no mouse wheel events
+either: the wheel is read from the HID mouse state (`switch_platform.cpp`).
+
+## Bigger sidebar (`switch.ini`)
+
+`UIScale` in `sdmc:/switch/ra2engine/switch.ini` draws the game at a lower resolution, so the sidebar, build
+icons, buttons, text and units all grow (the engine's phone canvas; like running the original at 1024x768):
+
+```
+UIScale=1.0            ; 1.0 = 1280x720 (default), 1.25 = 1024x576, 1.33 = 960x540, 1.5 = 853x480
+UIScaleHandheld=1.25   ; optional per-mode values, read when a match starts
+UIScaleDocked=1.0
+```
+
+At 1.5 the strip shows four rows of 90x72 icons; a skirmish stays at 60 fps.
 
 ## Text
 
