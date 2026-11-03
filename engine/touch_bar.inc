@@ -189,7 +189,14 @@ bool touch_bar_handle(ra2engine::InputEvent& ev) {
 // Per frame: the open column closes itself after kTbAutoClose seconds unused.
 void touch_bar_tick(double dt) {
     // W6-01-11: BOX drags only on the open playfield (menus / dialogs scroll).
+#ifdef __SWITCH__
+    ra2_switch_set_scroll_rate(g_user_settings ? g_user_settings->scroll_rate : ra2engine::Settings{}.scroll_rate);
+    // Before the first touch too (the column appears with it): the first drag is a box already.
+    ra2engine::TouchGestures::set_box_mode(touch_box_ && !menu_.open_ && !sld_.is_open() && !gf_abort_.open() &&
+                                           !input_locked_);
+#else
     ra2engine::TouchGestures::set_box_mode(touch_box_ && touch_bar_visible());
+#endif
     if (!touch_bar_open_) { touch_bar_idle_ = 0.0; return; }
     touch_bar_idle_ += dt;
     if (touch_bar_idle_ >= kTbAutoClose) { touch_bar_open_ = false; touch_page2_ = false; }
@@ -228,7 +235,11 @@ bool touch_ui_ = false;   // desktop: appears after the first touch event
 bool touch_bar_open_ = false;   // W4-AM-05: closed by default
 double touch_bar_idle_ = 0.0;
 bool touch_add_ = false, touch_fire_ = false, touch_move_ = false;
+#ifdef __SWITCH__
+bool touch_box_ = true;      // Switch: one finger draws the band box, two fingers scroll (BOX toggles it)
+#else
 bool touch_box_ = false;     // W6-01-11 sticky BOX (TouchGestures::set_box_mode)
+#endif
 bool touch_page2_ = false;   // W6-01-09 the MORE page
 int touch_down_btn_ = -1;
 int touch_place_cx_ = INT_MIN, touch_place_cy_ = INT_MIN;

@@ -96,6 +96,12 @@ void read_switch_ini() {
 }
 }  // namespace
 
+namespace {
+int g_scroll_rate = 3;
+}
+void ra2_switch_set_scroll_rate(int rate) { g_scroll_rate = rate; }
+int ra2_switch_scroll_rate() { return g_scroll_rate; }
+
 int ra2_switch_game_height() {
     read_switch_ini();
     const bool docked = appletGetOperationMode() == AppletOperationMode_Console;

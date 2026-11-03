@@ -4,11 +4,14 @@
 #include "sidebar.hpp"
 #include "switch_platform.hpp"
 
+#include <dirent.h>
+
 #include <algorithm>
 #include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <string>
 
@@ -29,6 +32,7 @@ enum : int {
     kVkTeam1 = '1', kVkTabInfantry = 'E', kVkGuard = 'G', kVkCenterBase = 'H',
     kVkRepair = 'K', kVkSell = 'L', kVkCombatants = 'P', kVkTabStructures = 'Q',
     kVkTabUnits = 'R', kVkStop = 'S', kVkDeploy = 'D', kVkTabDefenses = 'W', kVkScatter = 'X',
+    kVkSidebarUp = 104, kVkSidebarDown = 98,   // numpad 8 / 2
 };
 // D-pad left/right walk the sidebar tabs in their on-screen order.
 constexpr int kTabs[] = {kVkTabStructures, kVkTabDefenses, kVkTabInfantry, kVkTabUnits};
@@ -107,7 +111,91 @@ std::string trim(const std::string& s) {
 }
 }  // namespace
 
-void SwitchGamepad::load_keymap(const char* path) {
+// keymap.keys, or the first other "keymap*" file in the folder that is not an .example: a
+// layout saved from Windows is often keymap.keys.txt (the extension hidden), or keeps a suffix.
+void SwitchGamepad::find_keymap() {
+    const std::string dir = RA2_SWITCH_BASE_DIR;
+    std::string found;
+    if (std::ifstream(dir + "keymap.keys")) {
+        found = "keymap.keys";
+    } else if (DIR* d = opendir(dir.c_str())) {
+        std::vector<std::string> names;
+        while (const dirent* e = readdir(d)) {
+            std::string n = e->d_name, l = n;
+            for (char& ch : l) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+            const auto ends = [&l](const char* x) {
+                const std::size_t k = std::strlen(x);
+                return l.size() >= k && l.compare(l.size() - k, k, x) == 0;
+            };
+            if (l.rfind("keymap", 0) == 0 && !ends(".example") && !ends(".example.txt")) names.push_back(n);
+        }
+        closedir(d);
+        std::sort(names.begin(), names.end());
+        if (!names.empty()) found = names.front();
+    }
+    if (found.empty()) {
+        std::fprintf(stderr, "[keymap] no %skeymap.keys: the built-in controls\n", dir.c_str());
+        return;
+    }
+    load_keymap(dir + found);
+}
+
+// One "BUTTON=value" value -> bind; false (logged) when it is not understood.
+bool SwitchGamepad::parse_binding(const std::string& key, const std::string& val, Binding& bind) const {
+    std::string uval = val;
+    for (char& ch : uval) ch = static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
+    bind = Binding{};
+    if (uval.empty() || uval == "DEFAULT") {
+        bind.kind = Binding::Default;
+    } else if (uval == "NONE") {
+        bind.kind = Binding::None;
+    } else if (uval == "MOUSE_LEFT" || uval == "LEFT_CLICK") {
+        bind.kind = Binding::MouseLeft;
+    } else if (uval == "MOUSE_RIGHT" || uval == "RIGHT_CLICK") {
+        bind.kind = Binding::MouseRight;
+    } else if (uval == "SIDEBAR" || uval == "BUILD_LIST") {
+        bind.kind = Binding::Sidebar;
+    } else if (uval == "SIDEBAR_HOLD" || uval == "BUILD_LIST_HOLD") {
+        bind.kind = Binding::SidebarHold;
+    } else if (uval == "SIDEBAR_UP" || uval == "BUILD_LIST_UP") {
+        bind.kind = Binding::Vk;
+        bind.vk = kVkSidebarUp;
+    } else if (uval == "SIDEBAR_DOWN" || uval == "BUILD_LIST_DOWN") {
+        bind.kind = Binding::Vk;
+        bind.vk = kVkSidebarDown;
+    } else {
+        // "h", "ESC", "RIGHT CTRL", "CTRL+1": modifiers joined with '+' before the key.
+        int mods = 0, k = 0;
+        bool ok = true;
+        std::size_t start = 0;
+        while (ok) {
+            const std::size_t plus = val.find('+', start + 1);   // a lone "+" is the key itself
+            const std::string part = trim(val.substr(start, plus == std::string::npos ? std::string::npos
+                                                                                      : plus - start));
+            const int pk = key_from_name(part);
+            if (pk == SDLK_UNKNOWN) ok = false;
+            if (plus == std::string::npos) { k = pk; break; }
+            if (!mod_of_key(pk)) ok = false;
+            mods |= mod_of_key(pk);
+            start = plus + 1;
+        }
+        if (!ok || k == SDLK_UNKNOWN) {
+            std::fprintf(stderr, "[keymap] %s=%s: unknown key ignored\n", key.c_str(), val.c_str());
+            return false;
+        }
+        if (mod_of_key(k) && !mods) {
+            bind.kind = Binding::Modifier;   // held: Ctrl / Shift / Alt for the other buttons
+            bind.mods = mod_of_key(k);
+        } else {
+            bind.kind = Binding::Key;
+            bind.sdl_key = k;
+            bind.mods = mods;
+        }
+    }
+    return true;
+}
+
+void SwitchGamepad::load_keymap(const std::string& path) {
     std::ifstream in(path);
     if (!in) return;
     int n = 0;
@@ -126,57 +214,32 @@ void SwitchGamepad::load_keymap(const char* path) {
         if (key == "DPAD_ARROWS") { dpad_pan_ = on; ++n; continue; }
         // The stick that is not the cursor scrolls the map anyway.
         if (key == "LSTICK_ARROWS" || key == "RSTICK_ARROWS") { ++n; continue; }
-        const int b = button_from_name(key);
-        if (b < 0) {
+        if (key == "CURSOR_SPEED" || key == "MAP_SPEED") {
+            const float v = std::clamp(static_cast<float>(std::atof(val.c_str())), 0.1f, 5.0f);
+            (key == "CURSOR_SPEED" ? cursor_mult_ : map_mult_) = v;
+            ++n;
+            continue;
+        }
+        // "A+DRIGHT": a chord (the first button held, then the second).
+        const std::size_t plus = key.find('+', 1);
+        const int hold = plus == std::string::npos ? -1 : button_from_name(trim(key.substr(0, plus)));
+        const int b = button_from_name(plus == std::string::npos ? key : trim(key.substr(plus + 1)));
+        if (b < 0 || (plus != std::string::npos && (hold < 0 || hold == b))) {
             std::fprintf(stderr, "[keymap] %s: unknown setting ignored\n", key.c_str());
             continue;
         }
         Binding bind;
-        if (uval.empty() || uval == "DEFAULT") {
-            bind.kind = Binding::Default;
-        } else if (uval == "NONE") {
-            bind.kind = Binding::None;
-        } else if (uval == "MOUSE_LEFT" || uval == "LEFT_CLICK") {
-            bind.kind = Binding::MouseLeft;
-        } else if (uval == "MOUSE_RIGHT" || uval == "RIGHT_CLICK") {
-            bind.kind = Binding::MouseRight;
-        } else if (uval == "SIDEBAR" || uval == "BUILD_LIST") {
-            bind.kind = Binding::Sidebar;
-        } else if (uval == "SIDEBAR_HOLD" || uval == "BUILD_LIST_HOLD") {
-            bind.kind = Binding::SidebarHold;
+        if (!parse_binding(key, val, bind)) continue;
+        if (hold >= 0) {
+            chords_.push_back(Chord{hold, b, bind});
+            prefix_[hold] = true;
         } else {
-            // "h", "ESC", "RIGHT CTRL", "CTRL+1": modifiers joined with '+' before the key.
-            int mods = 0, k = 0;
-            bool ok = true;
-            std::size_t start = 0;
-            while (ok) {
-                const std::size_t plus = val.find('+', start + 1);   // a lone "+" is the key itself
-                const std::string part = trim(val.substr(start, plus == std::string::npos ? std::string::npos
-                                                                                          : plus - start));
-                const int pk = key_from_name(part);
-                if (pk == SDLK_UNKNOWN) ok = false;
-                if (plus == std::string::npos) { k = pk; break; }
-                if (!mod_of_key(pk)) ok = false;
-                mods |= mod_of_key(pk);
-                start = plus + 1;
-            }
-            if (!ok || k == SDLK_UNKNOWN) {
-                std::fprintf(stderr, "[keymap] %s=%s: unknown key ignored\n", key.c_str(), val.c_str());
-                continue;
-            }
-            if (mod_of_key(k) && !mods) {
-                bind.kind = Binding::Modifier;   // held: Ctrl / Shift / Alt for the other buttons
-                bind.mods = mod_of_key(k);
-            } else {
-                bind.kind = Binding::Key;
-                bind.sdl_key = k;
-                bind.mods = mods;
-            }
+            map_[b] = bind;
         }
-        map_[b] = bind;
         ++n;
     }
-    std::fprintf(stderr, "[keymap] %s: %d setting(s)%s\n", path, n, cursor_right_ ? ", right stick = cursor" : "");
+    std::fprintf(stderr, "[keymap] %s: %d setting(s), %d combo(s)%s\n", path.c_str(), n,
+                 static_cast<int>(chords_.size()), cursor_right_ ? ", right stick = cursor" : "");
 }
 
 int SwitchGamepad::held_mods() const {
@@ -188,7 +251,10 @@ int SwitchGamepad::held_mods() const {
 
 bool SwitchGamepad::custom_button(int b, bool down, uint32_t t) {
     if (b < 0 || b >= kButtons) return false;
-    const Binding& bind = map_[b];
+    return run_binding(map_[b], down, t);
+}
+
+bool SwitchGamepad::run_binding(const Binding& bind, bool down, uint32_t t) {
     switch (bind.kind) {
         case Binding::Default:
             return false;
@@ -211,6 +277,9 @@ bool SwitchGamepad::custom_button(int b, bool down, uint32_t t) {
         case Binding::SidebarHold:   // held: the build strip; released: back to the battlefield
             jump_sidebar(down, t);
             return true;
+        case Binding::Vk:
+            if (down) emit_vk(bind.vk, t);
+            return true;
         case Binding::Key: {
             if (!down) return true;
             InputEvent e;
@@ -226,12 +295,53 @@ bool SwitchGamepad::custom_button(int b, bool down, uint32_t t) {
     return false;
 }
 
+// Chords: a button pressed while a chord's first button is held runs the chord (until it is
+// released). The first button keeps its own action for a lone tap, run on release; held
+// actions (mouse buttons, SIDEBAR_HOLD, Ctrl / Shift / Alt) still start at once.
+bool SwitchGamepad::chord_button(int b, bool down, uint32_t t) {
+    if (b < 0 || b >= kButtons) return false;
+    if (down) {
+        for (std::size_t i = 0; i < chords_.size(); ++i) {
+            const Chord& c = chords_[i];
+            if (c.button != b || !down_[c.hold]) continue;
+            chord_used_[c.hold] = true;
+            active_chord_[b] = static_cast<int>(i);
+            down_[b] = true;
+            run_binding(c.bind, true, t);
+            return true;
+        }
+    } else if (active_chord_[b] >= 0) {
+        const Binding& bind = chords_[static_cast<std::size_t>(active_chord_[b])].bind;
+        active_chord_[b] = -1;
+        down_[b] = false;
+        run_binding(bind, false, t);
+        return true;
+    }
+    if (!prefix_[b]) return false;
+    const Binding::Kind k = map_[b].kind;
+    if (k == Binding::MouseLeft || k == Binding::MouseRight || k == Binding::SidebarHold || k == Binding::Modifier)
+        return false;   // the usual path, now
+    down_[b] = down;
+    if (down) {
+        chord_used_[b] = false;
+    } else if (!chord_used_[b]) {   // a lone tap: the button's own action
+        if (!run_binding(map_[b], true, t)) {
+            default_button(b, true, t);
+            default_button(b, false, t);
+        } else {
+            run_binding(map_[b], false, t);
+        }
+    }
+    return true;
+}
+
 void SwitchGamepad::init(int logical_w, int logical_h) {
     if (SDL_InitSubSystem(SDL_INIT_JOYSTICK) != 0) std::fprintf(stderr, "[pad] joystick init: %s\n", SDL_GetError());
     debug_ = SDL_getenv("RA2_PAD_DEBUG") != nullptr;
     SDL_JoystickEventState(SDL_ENABLE);
     set_logical_size(logical_w, logical_h);
-    load_keymap(RA2_SWITCH_BASE_DIR "keymap.keys");
+    for (int& c : active_chord_) c = -1;
+    find_keymap();
     cx_ = map_x_ = w_ * 0.5f;
     cy_ = map_y_ = h_ * 0.5f;
     open_all();
@@ -339,8 +449,14 @@ void SwitchGamepad::button(int b, bool down, uint32_t t) {
     // Any other button while R / ZL is held makes it a modifier, not a tap.
     if (down && b != kBtnR) r_used_ = true;
     if (down && b != kBtnZL) zl_used_ = true;
+    if (chord_button(b, down, t)) return;
     if (b >= 0 && b < kButtons) down_[b] = down;
     if (custom_button(b, down, t)) return;
+    default_button(b, down, t);
+}
+
+// The built-in controls (README "Controls").
+void SwitchGamepad::default_button(int b, bool down, uint32_t t) {
     if (dpad_pan_ && (b == kBtnUp || b == kBtnDown || b == kBtnLeft || b == kBtnRight) && !r_) return;   // tick()
     switch (b) {
         case kBtnA:
@@ -463,6 +579,12 @@ void SwitchGamepad::button(int b, bool down, uint32_t t) {
     }
 }
 
+// Options > Scroll Rate (0 fastest .. 6 slowest, 3 = the slider's middle): x1.25 a notch.
+float SwitchGamepad::speed() const {
+    const int rate = std::clamp(ra2_switch_scroll_rate(), 0, 6);
+    return std::pow(1.25f, static_cast<float>(3 - rate));
+}
+
 void SwitchGamepad::tick(uint32_t now) {
     const uint32_t prev = last_tick_;
     last_tick_ = now;
@@ -489,7 +611,7 @@ void SwitchGamepad::tick(uint32_t now) {
         std::fprintf(stderr, "[pad] sticks %.2f %.2f / %.2f %.2f cursor %.0f,%.0f\n", lx, ly, rx, ry, cx_, cy_);
     // Left stick: the cursor.
     if (rx || ry) {
-        const float v = kCursorSpeed * w_ * dt;
+        const float v = kCursorSpeed * cursor_mult_ * speed() * w_ * dt;
         move_cursor(std::clamp(cx_ + rx * v, 0.0f, w_ - 1.0f), std::clamp(cy_ + ry * v, 0.0f, h_ - 1.0f), now);
         // Y held and moved: the band box (a left drag from where Y went down).
         if (y_ && !y_drag_ && (std::abs(static_cast<int>(cx_) - y_x_) > kDragSlop ||
@@ -502,7 +624,9 @@ void SwitchGamepad::tick(uint32_t now) {
     }
     // keymap DPAD_ARROWS: the D-pad scrolls the map like the arrow keys (at full deflection).
     if (dpad_pan_ && !r_ && !lx && !ly) {
-        auto held = [this](int b) { return down_[b] && map_[b].kind == Binding::Default ? 1.0f : 0.0f; };
+        auto held = [this](int b) {
+            return down_[b] && map_[b].kind == Binding::Default && active_chord_[b] < 0 ? 1.0f : 0.0f;
+        };
         lx = held(kBtnRight) - held(kBtnLeft);
         ly = held(kBtnDown) - held(kBtnUp);
     }
@@ -511,8 +635,9 @@ void SwitchGamepad::tick(uint32_t now) {
         const float boost = l_raw > 0.97f ? kPanEdgeBoost : 1.0f;
         // Pan's dx/dy is a finger drag (the map follows it): pushing the
         // stick right looks right, so the drag goes left.
-        pan_acc_x_ -= lx * kPanSpeed * boost * dt;
-        pan_acc_y_ -= ly * kPanSpeed * boost * dt;
+        const float v = kPanSpeed * map_mult_ * speed() * boost * dt;
+        pan_acc_x_ -= lx * v;
+        pan_acc_y_ -= ly * v;
         const int dx = static_cast<int>(pan_acc_x_), dy = static_cast<int>(pan_acc_y_);
         pan_acc_x_ -= dx;
         pan_acc_y_ -= dy;

@@ -69,7 +69,7 @@ The log warns when it runs in applet mode.
 
 | Input | Action |
 |---|---|
-| Left stick | Cursor (quadratic) |
+| Left stick | Cursor (quadratic; Options → Scroll Rate sets its speed) |
 | Right stick | Pan the map (quadratic; about twice as fast with the stick on its rim) |
 | A | Select / order (move, attack, harvest, enter...). Twice: every visible unit of that type |
 | B | Cancel / deselect; cancels building placement |
@@ -87,6 +87,8 @@ The log warns when it runs in applet mode.
 | − | Mission objectives (campaign) / pause menu (skirmish) |
 | + | Options / save / load menu |
 | Touch screen (handheld) | The touch controls (tap, drag, CMD column); the controller's cursor hides them again |
+| One-finger drag | Selection box (the BOX button in the touch column turns it off: then one finger scrolls) |
+| Two-finger drag | Scroll the map |
 | Three-finger tap | Select every combat unit (P) |
 | Rumble | A short pulse when the base is under attack |
 
@@ -112,8 +114,12 @@ PLUS=ESC
 Buttons: `A B X Y L R ZL ZR PLUS MINUS LSTICK RSTICK DUP DDOWN DLEFT DRIGHT`. A value is `MOUSE_LEFT`,
 `MOUSE_RIGHT`, a key (`h`, `2`, `ESC`, `ENTER`, `SPACE`, `HOME`, `F1`...), a combo (`CTRL+1`, `ALT+1`), a held
 modifier (`CTRL`, `SHIFT`, `ALT`, `RIGHT CTRL`...), `SIDEBAR` (tap: cursor to the build list and back, like R),
-`SIDEBAR_HOLD` (held: the cursor sits on the build list; released: back on the map), `NONE` or `DEFAULT`. Buttons
-left out keep the built-in action.
+`SIDEBAR_HOLD` (held: the cursor sits on the build list; released: back on the map), `SIDEBAR_UP` / `SIDEBAR_DOWN`
+(scroll the build list), `NONE` or `DEFAULT`. Buttons left out keep the built-in action.
+
+Combos: `A+DRIGHT=1` runs while A is held; A alone still does its own action, on release. `CURSOR_SPEED` and
+`MAP_SPEED` scale the sticks (Options → Scroll Rate scales them too, 1.25x a notch). A file saved as
+`keymap.keys.txt` (Windows hides the extension) or `keymap-anything` is read too when there is no `keymap.keys`.
 Keys act like the same key on a keyboard, so they follow the keyboard hotkeys below. The log names the file and
 any line it skipped (`[keymap]`).
 

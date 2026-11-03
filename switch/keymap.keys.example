@@ -1,5 +1,6 @@
 # RA2 Engine for Switch: controller remapping.
 # Rename this file to keymap.keys (in sdmc:/switch/ra2engine/) and restart the game.
+# The log (ra2engine.log) says which file was read: look for [keymap].
 # Buttons you leave out keep their built-in action (see README "Controls").
 #
 # Buttons: A B X Y L R ZL ZR PLUS MINUS LSTICK RSTICK DUP DDOWN DLEFT DRIGHT
@@ -11,13 +12,22 @@
 #     the other buttons (L=CTRL then Y=1 gives Ctrl+1)
 #   SIDEBAR: tap to jump the cursor to the build list and back (like R)
 #   SIDEBAR_HOLD: hold to put the cursor on the build list, release to go back to the map
+#   SIDEBAR_UP / SIDEBAR_DOWN: scroll the build list
 #   NONE: the button does nothing; DEFAULT: the built-in action
 #
 # Handy keys (the PC hotkeys, changeable in Options > Keyboard): h base, p select all
 # combat units, t select all of a type, d deploy, s stop, g guard, x scatter,
 # k repair, l sell, q w e r sidebar tabs, 1-0 teams, SPACE last radar event
 #
+# Combos: hold the first button, press the second. The first button still does its own
+# action when tapped alone.
+#   A+DRIGHT=1          hold A + D-pad right = select team 1
+#   MINUS+DRIGHT=CTRL+1 hold - + D-pad right = make team 1
+#   L3+R3=g             both sticks clicked = guard
+#
 # RSTICK_MOUSE=TRUE   the right stick moves the cursor, the left stick scrolls the map
+# CURSOR_SPEED=1.0    stick cursor speed (0.5 = half, 2 = double); Options > Scroll Rate changes it too
+# MAP_SPEED=1.0       stick map-scroll speed
 # DPAD_ARROWS=TRUE    the D-pad scrolls the map (R + D-pad still picks teams)
 
 RSTICK_MOUSE=TRUE

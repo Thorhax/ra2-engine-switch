@@ -26,6 +26,9 @@ int ra2_switch_mouse_wheel();
 // The game canvas height for switch.ini's UIScale (UIScaleHandheld / UIScaleDocked for the
 // current mode; 1.0-1.5, default 1.0): 720 / scale, so the sidebar, cameos and text grow by it.
 int ra2_switch_game_height();
+// Options > Scroll Rate (0 fastest .. 6 slowest), set by the game each frame; the stick speeds follow it.
+void ra2_switch_set_scroll_rate(int rate);
+int ra2_switch_scroll_rate();
 // A short rumble on every open controller (0..1 strength).
 void ra2_switch_rumble(float strength, int ms);
 // Heap in use / the process's memory, in bytes (the [perf] log line).

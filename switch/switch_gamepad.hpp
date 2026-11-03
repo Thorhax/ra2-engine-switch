@@ -12,6 +12,8 @@
 
 #include <cstdint>
 #include <deque>
+#include <string>
+#include <vector>
 
 namespace ra2engine {
 
@@ -38,13 +40,25 @@ public:
 private:
     // keymap.keys: one binding per button (Default = the built-in action).
     struct Binding {
-        enum Kind { Default, None, MouseLeft, MouseRight, Key, Modifier, Sidebar, SidebarHold } kind = Default;
+        enum Kind { Default, None, MouseLeft, MouseRight, Key, Modifier, Sidebar, SidebarHold, Vk } kind = Default;
         int sdl_key = 0;   // Key
         int mods = 0;      // Key: the combo's KMOD bits; Modifier: the KMOD bits held
+        int vk = 0;        // Vk: a KeyboardMD.ini hotkey code (SIDEBAR_UP / SIDEBAR_DOWN)
+    };
+    // keymap.keys "HOLD+BUTTON=value": while `hold` is down, `button` does `bind`.
+    struct Chord {
+        int hold = -1, button = -1;
+        Binding bind;
     };
     static constexpr int kButtons = 16;
-    void load_keymap(const char* path);
+    void find_keymap();
+    void load_keymap(const std::string& path);
+    bool parse_binding(const std::string& key, const std::string& val, Binding& bind) const;
     bool custom_button(int b, bool down, uint32_t t);   // true = a keymap binding handled it
+    bool run_binding(const Binding& bind, bool down, uint32_t t);   // false = Default
+    bool chord_button(int b, bool down, uint32_t t);    // true = a chord / chord prefix handled it
+    void default_button(int b, bool down, uint32_t t);
+    float speed() const;   // the in-game Scroll Rate slider: cursor / stick-scroll speed factor
     int held_mods() const;
 
     void open_all();
@@ -79,6 +93,11 @@ private:
     uint32_t l3_last_ = 0;                // L3 twice: CenterBase
     int tab_ = 0;                         // D-pad left/right: production tab
     Binding map_[kButtons];
+    std::vector<Chord> chords_;
+    bool prefix_[kButtons] = {};       // the first button of a chord: its own action on a lone tap
+    bool chord_used_[kButtons] = {};   // the prefix made a chord while held
+    int active_chord_[kButtons];       // the chord a held button runs (index in chords_), -1 none
+    float cursor_mult_ = 1.0f, map_mult_ = 1.0f;   // keymap CURSOR_SPEED / MAP_SPEED
     bool down_[kButtons] = {};
     bool cursor_right_ = false;   // keymap RSTICK_MOUSE: the right stick moves the cursor
     bool dpad_pan_ = false;       // keymap DPAD_ARROWS: the D-pad scrolls the map
