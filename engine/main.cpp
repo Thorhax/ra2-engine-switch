@@ -8352,6 +8352,14 @@ private:
     // W3-B [rules UnloadingClass=, HARV -> HORV, CMIN -> CMON]: the harvester
     // body shown while it dumps at a refinery.
     void load_unloading_classes() {
+        // The map is global but points into this scene's unload_va_: a restarted mission or a loaded
+        // game would otherwise keep the previous (destroyed) scene's entries and draw freed voxels the
+        // first time a harvester docks. Entries of this scene (a campaign calls this twice) stay.
+        for (auto it = g_unloading_class.begin(); it != g_unloading_class.end();) {
+            const bool mine = std::any_of(unload_va_.begin(), unload_va_.end(),
+                                          [&](const VehicleAssets& v) { return &v == it->second; });
+            it = mine ? std::next(it) : g_unloading_class.erase(it);
+        }
         const std::vector<const VehicleAssets*> cur = vlist_;
         for (const VehicleAssets* v : cur) {
             if (!v || !v->ok) continue;
