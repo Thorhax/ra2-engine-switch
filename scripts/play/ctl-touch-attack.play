@@ -1,0 +1,43 @@
+# CTL-TOUCH-ATTACK -- a finger tap on an enemy unit orders an attack, also when
+# the fingertip rolls during the tap (BOX mode: the roll used to start an empty
+# band box and the order was dropped).
+set render_every 0
+set on_quit continue
+click button "Single Player"
+click button Skirmish
+require scene == lobby
+click combo:country0
+click list:down
+click list:down
+click list:down
+click pick:Iraq
+click combo:ai1
+click "pick:Easy Enemy"
+click check:crates
+click slider:units=0
+click slider:speed=2
+click start
+until 120 scene == game
+click unit 0:SMCV
+key d
+until 450 built(0,NACNST) == 1
+cheat reveal
+cheat spawn HTNK 0 building 0:NACNST +6 +4
+cheat spawn HTNK 1 building 0:NACNST +6 +13
+wait 2
+shot before
+touch tap unit 0:HTNK
+wait 2
+require selected == 1
+# BOX mode on (the Switch default since v1.3)
+touch tap touch:CMD
+wait 2
+touch tap touch:BOX
+wait 2
+require selected == 1
+touch wobble unit 1:HTNK 16 10
+wait 2
+shot after
+assert sel_target != -1
+assert selected == 1
+end

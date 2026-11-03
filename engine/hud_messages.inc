@@ -71,9 +71,14 @@
         int y = 8;
         const SDL_Color col = hud_ui_color();
         const double sc = hud_touch_scale();   // W6-01-12: 1.5x on a touch canvas
+        int x = 8;
+#ifdef __SWITCH__
+        // The touch column sits in the top-left corner (touch_bar.inc tb_y0): the lines start right of it.
+        if (touch_bar_visible()) x = kTbX + (touch_bar_open_ ? 2 : 1) * (kTbW + kTbGap) + 6;
+#endif
         for (const HudMsg& m : msgs_) {
             if (m.expire <= msg_clock_) continue;
-            hud_text(ren, tc, m.text, 8, y, m.col.a ? m.col : col, kHudLeft, false, true, sc);
+            hud_text(ren, tc, m.text, x, y, m.col.a ? m.col : col, kHudLeft, false, true, sc);
             y += static_cast<int>(hud_text_height(m.text) * sc) + 4;
         }
     }

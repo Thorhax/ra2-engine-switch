@@ -80,6 +80,7 @@ void read_switch_ini() {
     if (g_ui.read) return;
     g_ui.read = true;
     FILE* f = std::fopen(RA2_SWITCH_BASE_DIR "switch.ini", "r");
+    if (!f) f = std::fopen(RA2_SWITCH_BASE_DIR "switch.ini.txt", "r");   // saved by Notepad
     if (!f) return;
     char line[256];
     while (std::fgets(line, sizeof line, f)) {

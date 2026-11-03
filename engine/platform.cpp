@@ -115,6 +115,7 @@ Platform Platform::create(const char* title, int w, int h, bool hidden) {
 #ifdef __SWITCH__
     p.p_->pad.init(w, h);
     p.p_->touch.set_three_finger_key(kKeySelectAll);   // three-finger tap = select every combat unit
+    p.p_->touch.set_slop(20);   // ~2 mm on the handheld screen: a rolling fingertip still taps
 #endif
     return p;
 }

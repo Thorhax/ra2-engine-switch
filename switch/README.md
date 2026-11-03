@@ -86,9 +86,9 @@ The log warns when it runs in applet mode.
 | D-pad ← / → | Previous / next production tab (Structures, Defenses, Infantry, Vehicles) |
 | − | Mission objectives (campaign) / pause menu (skirmish) |
 | + | Options / save / load menu |
-| Touch screen (handheld) | The touch controls (tap, drag, CMD column); the controller's cursor hides them again |
+| Touch screen (handheld) | The touch controls (tap, drag, CMD column in the top-left corner); the controller's cursor hides them again |
 | One-finger drag | Selection box (the BOX button in the touch column turns it off: then one finger scrolls) |
-| Two-finger drag | Scroll the map |
+| Two-finger drag | Scroll the map (Options → Scroll Rate sets the speed, as for the sticks) |
 | Three-finger tap | Select every combat unit (P) |
 | Rumble | A short pulse when the base is under attack |
 
@@ -137,7 +137,7 @@ either: the wheel is read from the HID mouse state (`switch_platform.cpp`).
 
 ## Bigger sidebar (`switch.ini`)
 
-`UIScale` in `sdmc:/switch/ra2engine/switch.ini` draws the game at a lower resolution, so the sidebar, build
+`UIScale` in `sdmc:/switch/ra2engine/switch.ini` (or `switch.ini.txt`) draws the game at a lower resolution, so the sidebar, build
 icons, buttons, text and units all grow (the engine's phone canvas; like running the original at 1024x768):
 
 ```

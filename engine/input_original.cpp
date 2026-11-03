@@ -28,6 +28,7 @@ namespace ra2engine {
 
 namespace {
 constexpr int kDragThresholdO = 6;      // same band threshold as the legacy model
+constexpr int kTouchTapBox = 40;       // a touch band box this small with no own unit = a tap
 constexpr uint32_t kDblMsO = 400;
 constexpr int kDblSlopO = 6;
 // W4-AM-09: a finger's double tap lands ~5 dp apart at best; touch uses a
@@ -590,6 +591,11 @@ void Input::handle_original(const InputEvent& ev) {
                         actions_.sell_building = bi;
                     }
                 }
+            } else if (dragging_ && ev.touch && !box_has_own_unit() &&
+                       std::abs(ev.x - down_x_) <= kTouchTapBox && std::abs(ev.y - down_y_) <= kTouchTapBox) {
+                // A tiny touch box with no own unit in it is a fingertip that rolled during a
+                // tap (BOX mode): the tap, at the point it began -- an enemy tapped is attacked.
+                left_click_original(down_x_, down_y_, down_shift_, ev.t_ms);
             } else if (dragging_) {
                 // W4-AM-01: an empty touch band box keeps the selection.
                 if (!ev.touch || box_has_own_unit()) commit_box(down_shift_);

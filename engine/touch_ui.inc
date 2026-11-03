@@ -319,7 +319,19 @@ bool touch_ui_handle(ra2engine::InputEvent& ev) {
     }
     if (touch_confirm_tap(ev)) return true;   // W6-01-02 / W6-01-07
     if (ev.kind == ra2engine::InputEvent::Pan) {
-        if (!(sidebar_up_ && lay_.contains(ev.x0, ev.y0))) return false;   // the map scrolls
+        if (!(sidebar_up_ && lay_.contains(ev.x0, ev.y0))) {   // the map scrolls
+#ifdef __SWITCH__
+            // Options -> Scroll Rate sets the finger scroll speed too (1.25x a notch, as the sticks).
+            const double f = std::pow(1.25, 3 - ra2_switch_scroll_rate());
+            touch_pan_fx_ += ev.dx * f;
+            touch_pan_fy_ += ev.dy * f;
+            ev.dx = static_cast<int>(touch_pan_fx_);
+            ev.dy = static_cast<int>(touch_pan_fy_);
+            touch_pan_fx_ -= ev.dx;
+            touch_pan_fy_ -= ev.dy;
+#endif
+            return false;
+        }
         // W4-AM-11: a drag that starts on the radar scrolls the view with it.
         if (lay_.radar.contains(ev.x0, ev.y0)) {
             int cx = 0, cy = 0;
@@ -339,6 +351,7 @@ bool touch_ui_handle(ra2engine::InputEvent& ev) {
 }
 int touch_strip_acc_ = 0;
 bool touch_swallow_up_ = false;
+double touch_pan_fx_ = 0.0, touch_pan_fy_ = 0.0;   // Switch: the scaled finger scroll's remainder
 
 // --- W6-01-03: a cameo HOLD on touch shows its tooltip only ------------------
 // [engine deviation, touch] With a mouse, hovering a cameo shows the tooltip

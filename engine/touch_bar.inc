@@ -36,7 +36,12 @@ enum : int { TB_TOGGLE = 1, TB_ADD, TB_FIRE, TB_MOVE, TB_STOP, TB_GUARD, TB_SCAT
 // the EVA lines), two columns per page.
 static constexpr int kTbW = 50, kTbH = 56, kTbGap = 2, kTbX = 4, kTbRows = 8;
 // The column is vertically centred on the left edge, below the EVA message lines.
+// Switch: at the top-left corner (the tester's request); the messages move right of it.
+#ifdef __SWITCH__
+int tb_y0() const { return 8; }
+#else
 int tb_y0() const { return std::max(56, (kWinH - kTbRows * (kTbH + kTbGap)) / 2); }
+#endif
 static constexpr double kTbAutoClose = 6.0;   // seconds without use
 const std::vector<TouchBtn>& touch_buttons() const {
     static const std::vector<TouchBtn> all = {

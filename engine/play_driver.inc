@@ -548,6 +548,20 @@ private:
                     tg_.finger_down(1, x + 3, y + 2, t + 200);
                     tg_.finger_up(1, x + 3, y + 2, t + 260);
                 }
+            } else if (g == "wobble") {
+                // touch wobble <target> DX DY: a tap whose finger slides DX/DY window pixels before
+                // it lifts (a real fingertip rolls a little).
+                int x = 0, y = 0;
+                if (c.args.size() < 5 || !point_of(c, p, 1, x, y)) {
+                    if (c.args.size() < 5) fail(c, "touch wobble <target> DX DY");
+                    return kConsume;
+                }
+                const int dx = std::atoi(c.args[c.args.size() - 2].c_str());
+                const int dy = std::atoi(c.args[c.args.size() - 1].c_str());
+                tg_.finger_down(1, x, y, t);
+                tg_.finger_move(1, x + dx / 2, y + dy / 2, t + 30);
+                tg_.finger_move(1, x + dx, y + dy, t + 60);
+                tg_.finger_up(1, x + dx, y + dy, t + 90);
             } else if (g == "drag" || g == "boxdrag" || g == "pan2") {
                 if (c.args.size() < 6) { fail(c, "touch " + g + " xy|cell X1 Y1 X2 Y2 | rel <target> FX1 FY1 FX2 FY2"); return kConsume; }
                 Cmd a = c, b = c;
