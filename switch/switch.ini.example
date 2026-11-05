@@ -3,7 +3,7 @@
 ;
 ; UIScale makes the sidebar, build icons, buttons, text and units bigger by
 ; drawing the game at a lower resolution, like the original at 1024x768:
-;   1.0 = 1280x720 (default), 1.25 = 1024x576, 1.33 = 960x540, 1.5 = 853x480.
+;   1.0 = 1280x720 (docked default), 1.25 = 1024x576 (handheld default), 1.33 = 960x540, 1.5 = 853x480.
 ; UIScaleHandheld / UIScaleDocked override it for one mode (read when a match starts).
 UIScale=1.0
 UIScaleHandheld=1.25

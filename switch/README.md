@@ -141,7 +141,7 @@ either: the wheel is read from the HID mouse state (`switch_platform.cpp`).
 icons, buttons, text and units all grow (the engine's phone canvas; like running the original at 1024x768):
 
 ```
-UIScale=1.0            ; 1.0 = 1280x720 (default), 1.25 = 1024x576, 1.33 = 960x540, 1.5 = 853x480
+UIScale=1.0            ; 1.0 = 1280x720 (docked default), 1.25 = 1024x576 (handheld default), 1.33 = 960x540, 1.5 = 853x480
 UIScaleHandheld=1.25   ; optional per-mode values, read when a match starts
 UIScaleDocked=1.0
 ```

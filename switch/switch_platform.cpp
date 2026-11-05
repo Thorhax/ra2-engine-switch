@@ -108,7 +108,7 @@ int ra2_switch_game_height() {
     const bool docked = appletGetOperationMode() == AppletOperationMode_Console;
     double s = docked ? g_ui.docked : g_ui.handheld;
     if (s <= 0) s = g_ui.all;
-    if (s <= 0) s = 1.0;
+    if (s <= 0) s = docked ? 1.0 : 1.25;   // handheld: the bigger sidebar unless switch.ini says otherwise
     s = std::max(1.0, std::min(1.5, s));
     return static_cast<int>(std::lround(720.0 / s)) & ~1;
 }

@@ -6994,7 +6994,8 @@ public:
                          touch_mode(), touch_box_ ? 1 : 0);
         // Handheld touch and the controller take turns: the controller's
         // pointer (no finger) puts the touch column / hints away again.
-        else if (ev.kind == ra2engine::InputEvent::PointerMove || ev.kind == ra2engine::InputEvent::PointerDown) {
+        if (!ev.touch &&
+            (ev.kind == ra2engine::InputEvent::PointerMove || ev.kind == ra2engine::InputEvent::PointerDown)) {
             touch_ui_ = false;
             touch_bar_open_ = false;
         }
