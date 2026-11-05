@@ -186,6 +186,7 @@ void perf_draw(SDL_Renderer* ren, int W, int H) {
 std::string g_record_path;   // --record <file> / RA2_RECORD
 std::string g_replay_path;   // --replay <file>
 bool g_replay_hidden = false;
+std::vector<std::string> g_dev_cheats;   // --dev-cheat "<--play cheat>" (repeatable): rig tests of real input
 
 struct InputRecorder {
     std::ofstream out;

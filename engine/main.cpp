@@ -7072,6 +7072,39 @@ public:
         input_.handle(ev);
     }
 
+    // --dev-cheat: the --play cheats run once, 2 s into an interactive match, so the
+    // console rig can try real touch / controller input on scripted state.
+    // "own +DX +DY" in place of "cell X Y" is relative to the first own unit; commas may stand for spaces.
+    double dev_cheat_t_ = 0.0;
+    void dev_cheat_tick(double dt) {
+        if (g_dev_cheats.empty() || (dev_cheat_t_ += dt) < 2.0) return;
+        ra2play::Probe p;
+        play_probe(p);
+        int ox = 0, oy = 0;
+        for (const ra2engine::Unit& u : world_.units())
+            if (u.house == local_house_ && u.alive && u.die_time < 0.0) {
+                ox = static_cast<int>(u.fx);
+                oy = static_cast<int>(u.fy);
+                break;
+            }
+        for (const std::string& line : g_dev_cheats) {
+            std::vector<std::string> a;
+            std::string words = line;   // "spawn,HTNK,1,own,4,4": no spaces in an nxlink argument
+            std::replace(words.begin(), words.end(), ',', ' ');
+            std::istringstream is(words);
+            for (std::string w; is >> w;) a.push_back(w);
+            for (size_t i = 0; i + 2 < a.size(); ++i)
+                if (a[i] == "own") {
+                    a[i] = "cell";
+                    a[i + 1] = std::to_string(ox + std::atoi(a[i + 1].c_str()));
+                    a[i + 2] = std::to_string(oy + std::atoi(a[i + 2].c_str()));
+                }
+            const std::string r = p.cheat ? p.cheat(a) : "no cheats";
+            std::fprintf(stderr, "[dev-cheat] %s: %s\n", line.c_str(), r.empty() ? "ok" : r.c_str());
+        }
+        g_dev_cheats.clear();
+    }
+
     // One step of the former loop body: camera pan, edge-detects, world.step,
     // production, exit handoff, free units, audio events, placement/SW confirm.
     void update(double dt) override {
@@ -7079,6 +7112,7 @@ public:
         tooltip_tick(dt);   // W2-UI-07 hover timer (game time)
         touch_bar_tick(dt);   // W4-AM-05: the open touch column closes itself
         touch_hint_tick(dt);  // W4-AM-01: the gesture hint
+        dev_cheat_tick(dt);
         // P7: the options menu / save-load dialog pause the game (the original
         // runs them as a modal loop; the scenario does not advance meanwhile).
         if (ingame_movie_.active()) {   // W5-E: a trigger movie pauses the scenario
@@ -19069,6 +19103,7 @@ int main(int argc, char** argv) {
             if (a == "--record-input" && i + 1 < argc) g_record_path = argv[i + 1];     // R-184 raw input
             if (a == "--replay" && i + 1 < argc) g_replay_path = argv[i + 1];
             if (a == "--hidden") g_replay_hidden = true;
+            if (a == "--dev-cheat" && i + 1 < argc) g_dev_cheats.push_back(argv[i + 1]);
         }
         if (g_cmd_record_path.empty())
             if (const char* r = std::getenv("RA2_RECORD")) g_cmd_record_path = r;

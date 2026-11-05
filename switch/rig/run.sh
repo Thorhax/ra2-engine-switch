@@ -14,7 +14,7 @@ fi
 send() { timeout "$((secs + 15))" stdbuf -o0 -e0 "$NXL" -s -a "$SWITCH_IP" -p "${SD_DIR#/switch/}/ra2engine.nro" "$nro" ${1:+--args "$*"} > "$d/nxlink.log" 2>&1 & }
 send "$@"; pid=$!
 sleep 8
-if grep -q -i "failed\|refused" "$d/nxlink.log"; then   # netloader not ready (seen after a reboot): B, Y, retry
+if ! grep -q "server active" "$d/nxlink.log" && grep -q -i "failed\|refused" "$d/nxlink.log"; then   # nxlink's, not the engine's   # netloader not ready (seen after a reboot): B, Y, retry
   wait $pid 2>/dev/null; sb "click B" "sleep 2" "click Y" "sleep 4"; send "$@"; pid=$!
 fi
 t=0
